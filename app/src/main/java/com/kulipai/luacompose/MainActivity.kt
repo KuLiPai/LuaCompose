@@ -110,9 +110,8 @@ fun loadLuaScope(context: Context): LuaScope {
     // 1. 初始化 luaj++ 虚拟机环境
     val globals: Globals = JsePlatform.standardGlobals()
 
-    // 2. 加载 assets 下的 compose.lua 库
-    val composeLibContent = context.assets.open("compose.lua").bufferedReader().use { it.readText() }
-    val composeLib = globals.load(composeLibContent, "compose.lua").call()
+    // 2. 初始化 Kotlin 侧实现的 Compose DSL 库
+    val composeLib = com.kulipai.luacompose.compose.LuaComposeLib()
     globals.set("compose", composeLib)
 
     // 3. 注册 Modifier 全局对象
@@ -143,10 +142,10 @@ fun loadLuaScope(context: Context): LuaScope {
             local TextField = compose.TextField
             
             -- 直接使用 setContent 加载布局，无需在末尾使用 return
-            compose.setContent(function(scope)
+            compose.setContent(function()
               -- 创建响应式状态
-              local count = scope:state(0)
-              local textInput = scope:state("Hello AndroLua")
+              local count = compose.state(0)
+              local textInput = compose.state("Hello AndroLua")
             
               Column {
                 modifier = Modifier().fillMaxSize().padding(16),
@@ -207,24 +206,14 @@ fun loadLuaScope(context: Context): LuaScope {
     // 5. 加载并运行主 Lua 脚本
     val scriptContent = mainLuaFile.readText()
     val userScriptResult = globals.load(scriptContent, "main.lua").call()
-    
-    // 6. 优先从 compose.rootContentFunc 读取布局函数，其次从脚本返回值中读取
-    val composeTable = globals.get("compose")
-    val rootLuaFunction = if (composeTable.get("rootContentFunc").isfunction()) {
-        composeTable.get("rootContentFunc") as LuaFunction
-    } else {
-        userScriptResult as? LuaFunction
-            ?: throw RuntimeException("请使用 compose.setContent(function) 设置布局，或者在 main.lua 结尾返回布局函数")
-    }
 
-    // 7. 创建 Kotlin 侧的 LuaScope 并绑定到 Lua 侧的对象
+    // 6. 优先从 compose.rootContentFunc 读取布局函数，其次从脚本返回值中读取
+    val rootLuaFunction = composeLib.rootContentFunc
+        ?: userScriptResult as? LuaFunction
+        ?: throw RuntimeException("请使用 compose.setContent(function) 设置布局，或者在 main.lua 结尾返回布局函数")
+
+    // 7. 创建 Kotlin 侧的 LuaScope
     val rootScope = LuaScope(rootLuaFunction)
-    val luaScopeClass = composeTable.get("Scope")
-    val javaScopeObj = luaScopeClass.get("new").call(
-        rootLuaFunction,
-        CoerceJavaToLua.coerce(rootScope)
-    )
-    rootScope.setLuaScopeObj(javaScopeObj)
 
     return rootScope
 }

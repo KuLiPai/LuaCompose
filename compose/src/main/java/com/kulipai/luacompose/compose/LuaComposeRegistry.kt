@@ -2,78 +2,330 @@ package com.kulipai.luacompose.compose
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.luaj.LuaFunction
+import org.luaj.LuaTable
 import org.luaj.LuaValue
 import org.luaj.lib.jse.CoerceJavaToLua
 
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Path
+
+class LuaPath(val path: Path = Path()) : LuaTable() {
+    init {
+        set("moveTo", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(x: LuaValue, y: LuaValue): LuaValue {
+                path.moveTo(x.tofloat(), y.tofloat())
+                return this@LuaPath
+            }
+        })
+        set("lineTo", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(x: LuaValue, y: LuaValue): LuaValue {
+                path.lineTo(x.tofloat(), y.tofloat())
+                return this@LuaPath
+            }
+        })
+        set("quadraticBezierTo", object : org.luaj.lib.VarArgFunction() {
+            override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
+                path.quadraticBezierTo(
+                    args.checkdouble(1).toFloat(), args.checkdouble(2).toFloat(),
+                    args.checkdouble(3).toFloat(), args.checkdouble(4).toFloat()
+                )
+                return this@LuaPath
+            }
+        })
+        set("cubicTo", object : org.luaj.lib.VarArgFunction() {
+            override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
+                path.cubicTo(
+                    args.checkdouble(1).toFloat(), args.checkdouble(2).toFloat(),
+                    args.checkdouble(3).toFloat(), args.checkdouble(4).toFloat(),
+                    args.checkdouble(5).toFloat(), args.checkdouble(6).toFloat()
+                )
+                return this@LuaPath
+            }
+        })
+        set("close", object : org.luaj.lib.ZeroArgFunction() {
+            override fun call(): LuaValue {
+                path.close()
+                return this@LuaPath
+            }
+        })
+    }
+}
+
+class LuaDrawScope(val drawScope: DrawScope) : LuaTable() {
+    init {
+        set("drawRect", object : org.luaj.lib.OneArgFunction() {
+            override fun call(args: LuaValue): LuaValue {
+                val color = resolveColor(args.get("color"))
+                val x = args.get("x").optdouble(0.0).toFloat()
+                val y = args.get("y").optdouble(0.0).toFloat()
+                val width = args.get("width").optdouble(100.0).toFloat()
+                val height = args.get("height").optdouble(100.0).toFloat()
+                drawScope.drawRect(
+                    color = color,
+                    topLeft = Offset(x, y),
+                    size = Size(width, height)
+                )
+                return NIL
+            }
+        })
+        set("drawRoundRect", object : org.luaj.lib.OneArgFunction() {
+            override fun call(args: LuaValue): LuaValue {
+                val color = resolveColor(args.get("color"))
+                val x = args.get("x").optdouble(0.0).toFloat()
+                val y = args.get("y").optdouble(0.0).toFloat()
+                val width = args.get("width").optdouble(100.0).toFloat()
+                val height = args.get("height").optdouble(100.0).toFloat()
+                val cornerX = args.get("cornerRadiusX").optdouble(0.0).toFloat()
+                val cornerY = args.get("cornerRadiusY").optdouble(cornerX.toDouble()).toFloat()
+                drawScope.drawRoundRect(
+                    color = color,
+                    topLeft = Offset(x, y),
+                    size = Size(width, height),
+                    cornerRadius = CornerRadius(cornerX, cornerY)
+                )
+                return NIL
+            }
+        })
+        set("drawCircle", object : org.luaj.lib.OneArgFunction() {
+            override fun call(args: LuaValue): LuaValue {
+                val color = resolveColor(args.get("color"))
+                val radius = args.get("radius").optdouble(50.0).toFloat()
+                val cx = args.get("centerX").optdouble(50.0).toFloat()
+                val cy = args.get("centerY").optdouble(50.0).toFloat()
+                drawScope.drawCircle(
+                    color = color,
+                    radius = radius,
+                    center = Offset(cx, cy)
+                )
+                return NIL
+            }
+        })
+        set("drawOval", object : org.luaj.lib.OneArgFunction() {
+            override fun call(args: LuaValue): LuaValue {
+                val color = resolveColor(args.get("color"))
+                val x = args.get("x").optdouble(0.0).toFloat()
+                val y = args.get("y").optdouble(0.0).toFloat()
+                val width = args.get("width").optdouble(100.0).toFloat()
+                val height = args.get("height").optdouble(100.0).toFloat()
+                drawScope.drawOval(
+                    color = color,
+                    topLeft = Offset(x, y),
+                    size = Size(width, height)
+                )
+                return NIL
+            }
+        })
+        set("drawArc", object : org.luaj.lib.OneArgFunction() {
+            override fun call(args: LuaValue): LuaValue {
+                val color = resolveColor(args.get("color"))
+                val startAngle = args.get("startAngle").optdouble(0.0).toFloat()
+                val sweepAngle = args.get("sweepAngle").optdouble(0.0).toFloat()
+                val useCenter = args.get("useCenter").optboolean(true)
+                val x = args.get("x").optdouble(0.0).toFloat()
+                val y = args.get("y").optdouble(0.0).toFloat()
+                val width = args.get("width").optdouble(100.0).toFloat()
+                val height = args.get("height").optdouble(100.0).toFloat()
+                drawScope.drawArc(
+                    color = color,
+                    startAngle = startAngle,
+                    sweepAngle = sweepAngle,
+                    useCenter = useCenter,
+                    topLeft = Offset(x, y),
+                    size = Size(width, height)
+                )
+                return NIL
+            }
+        })
+        set("drawLine", object : org.luaj.lib.OneArgFunction() {
+            override fun call(args: LuaValue): LuaValue {
+                val color = resolveColor(args.get("color"))
+                val startX = args.get("startX").optdouble(0.0).toFloat()
+                val startY = args.get("startY").optdouble(0.0).toFloat()
+                val endX = args.get("endX").optdouble(0.0).toFloat()
+                val endY = args.get("endY").optdouble(0.0).toFloat()
+                val strokeWidth = args.get("strokeWidth").optdouble(1.0).toFloat()
+                drawScope.drawLine(
+                    color = color,
+                    start = Offset(startX, startY),
+                    end = Offset(endX, endY),
+                    strokeWidth = strokeWidth
+                )
+                return NIL
+            }
+        })
+        set("drawPath", object : org.luaj.lib.OneArgFunction() {
+            override fun call(args: LuaValue): LuaValue {
+                val color = resolveColor(args.get("color"))
+                val luaPath = args.get("path")
+                if (luaPath is LuaPath) {
+                    drawScope.drawPath(
+                        path = luaPath.path,
+                        color = color
+                    )
+                }
+                return NIL
+            }
+        })
+    }
+}
+
 object LuaComposeRegistry {
-    val components = mutableMapOf<String, @Composable (props: Map<String, Any?>, children: List<LuaNode>) -> Unit>()
+    val components = mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: LuaScope?) -> Unit>()
 
     init {
+        // --- 0. 生命周期与副作用 ---
+
+        register("LaunchedEffect") { props, _ ->
+            val key = props["key"]
+            val contentFunc = props["content"] as? LuaFunction
+            
+            androidx.compose.runtime.LaunchedEffect(key) {
+                withContext(Dispatchers.Default) {
+                    try {
+                        contentFunc?.call()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+
+        register("DisposableEffect") { props, _ ->
+            val key = props["key"]
+            val contentFunc = props["content"] as? LuaFunction
+            
+            androidx.compose.runtime.DisposableEffect(key) {
+                var onDisposeFunc: LuaFunction? = null
+                try {
+                    val result = contentFunc?.call()
+                    if (result != null && result.isfunction()) {
+                        onDisposeFunc = result.checkfunction()
+                    } else if (result != null && result.istable() && result.get("onDispose").isfunction()) {
+                        onDisposeFunc = result.get("onDispose").checkfunction()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                
+                onDispose {
+                    try {
+                        onDisposeFunc?.call()
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+
         // --- 1. 基础排版组件 ---
         
-        // Text
         register("Text") { props, _ ->
             val textVal = when (val textProp = props["text"]) {
                 is LuaState -> textProp.get()?.toString() ?: ""
                 else -> textProp?.toString() ?: ""
             }
+            val spVal = resolveSp(props["fontSize"])
             Text(
                 text = textVal,
                 modifier = resolveModifier(props["modifier"]),
-                color = resolveColor(props["color"])
+                color = resolveColor(props["color"]),
+                fontSize = if (spVal != androidx.compose.ui.unit.TextUnit.Unspecified) spVal else androidx.compose.ui.unit.TextUnit.Unspecified
             )
         }
 
-        // Column
-        register("Column") { props, children ->
+        register("Column") { props, childScope ->
             val modifier = resolveModifier(props["modifier"])
             Column(
                 modifier = modifier,
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.Start
             ) {
-                renderChildren(children, this)
+                childScope?.let { LuaScopeComponent(it, this) }
             }
         }
 
-        // Row
-        register("Row") { props, children ->
+        register("Row") { props, childScope ->
             val modifier = resolveModifier(props["modifier"])
             Row(
                 modifier = modifier,
                 horizontalArrangement = Arrangement.Start,
                 verticalAlignment = Alignment.Top
             ) {
-                renderChildren(children, this)
+                childScope?.let { LuaScopeComponent(it, this) }
             }
         }
 
-        // Box
-        register("Box") { props, children ->
+        register("Box") { props, childScope ->
             val modifier = resolveModifier(props["modifier"])
             Box(
                 modifier = modifier,
                 contentAlignment = Alignment.TopStart
             ) {
-                renderChildren(children, this)
+                childScope?.let { LuaScopeComponent(it, this) }
             }
         }
 
-        // Spacer
+        register("Canvas") { props, _ ->
+            val modifier = resolveModifier(props["modifier"])
+            val onDraw = props["onDraw"] as? LuaFunction
+            
+            Canvas(modifier = modifier) {
+                if (onDraw != null) {
+                    val luaDrawScope = LuaDrawScope(this)
+                    try {
+                        onDraw.call(luaDrawScope)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+
+        register("ScrollableColumn") { props, childScope ->
+            val modifier = resolveModifier(props["modifier"]).verticalScroll(rememberScrollState())
+            Column(
+                modifier = modifier,
+                verticalArrangement = Arrangement.Top,
+                horizontalAlignment = Alignment.Start
+            ) {
+                childScope?.let { LuaScopeComponent(it, this) }
+            }
+        }
+
+        register("ScrollableRow") { props, childScope ->
+            val modifier = resolveModifier(props["modifier"]).horizontalScroll(rememberScrollState())
+            Row(
+                modifier = modifier,
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.Top
+            ) {
+                childScope?.let { LuaScopeComponent(it, this) }
+            }
+        }
+
         register("Spacer") { props, _ ->
             Spacer(modifier = resolveModifier(props["modifier"]))
         }
 
-        // Divider
         register("Divider") { props, _ ->
             HorizontalDivider(
                 modifier = resolveModifier(props["modifier"]),
@@ -83,110 +335,100 @@ object LuaComposeRegistry {
 
         // --- 2. 按钮类组件 (Material 3) ---
 
-        // Button
-        register("Button") { props, children ->
+        register("Button") { props, childScope ->
             val onClick = props["onClick"] as? LuaFunction
             Button(
                 onClick = { onClick?.call() },
                 modifier = resolveModifier(props["modifier"])
             ) {
-                children.forEach { LuaNodeRenderer(it) }
+                childScope?.let { LuaScopeComponent(it, this) }
             }
         }
 
-        // ElevatedButton
-        register("ElevatedButton") { props, children ->
+        register("ElevatedButton") { props, childScope ->
             val onClick = props["onClick"] as? LuaFunction
             ElevatedButton(
                 onClick = { onClick?.call() },
                 modifier = resolveModifier(props["modifier"])
             ) {
-                children.forEach { LuaNodeRenderer(it) }
+                childScope?.let { LuaScopeComponent(it, this) }
             }
         }
 
-        // FilledTonalButton
-        register("FilledTonalButton") { props, children ->
+        register("FilledTonalButton") { props, childScope ->
             val onClick = props["onClick"] as? LuaFunction
             FilledTonalButton(
                 onClick = { onClick?.call() },
                 modifier = resolveModifier(props["modifier"])
             ) {
-                children.forEach { LuaNodeRenderer(it) }
+                childScope?.let { LuaScopeComponent(it, this) }
             }
         }
 
-        // OutlinedButton
-        register("OutlinedButton") { props, children ->
+        register("OutlinedButton") { props, childScope ->
             val onClick = props["onClick"] as? LuaFunction
             OutlinedButton(
                 onClick = { onClick?.call() },
                 modifier = resolveModifier(props["modifier"])
             ) {
-                children.forEach { LuaNodeRenderer(it) }
+                childScope?.let { LuaScopeComponent(it, this) }
             }
         }
 
-        // TextButton
-        register("TextButton") { props, children ->
+        register("TextButton") { props, childScope ->
             val onClick = props["onClick"] as? LuaFunction
             TextButton(
                 onClick = { onClick?.call() },
                 modifier = resolveModifier(props["modifier"])
             ) {
-                children.forEach { LuaNodeRenderer(it) }
+                childScope?.let { LuaScopeComponent(it, this) }
             }
         }
 
-        // IconButton
-        register("IconButton") { props, children ->
+        register("IconButton") { props, childScope ->
             val onClick = props["onClick"] as? LuaFunction
             IconButton(
                 onClick = { onClick?.call() },
                 modifier = resolveModifier(props["modifier"])
             ) {
-                children.forEach { LuaNodeRenderer(it) }
+                childScope?.let { LuaScopeComponent(it, this) }
             }
         }
 
         // --- 3. 卡片类组件 (Material 3) ---
 
-        // Card
-        register("Card") { props, children ->
+        register("Card") { props, childScope ->
             Card(
                 modifier = resolveModifier(props["modifier"])
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    children.forEach { LuaNodeRenderer(it) }
+                    childScope?.let { LuaScopeComponent(it, this) }
                 }
             }
         }
 
-        // ElevatedButton
-        register("ElevatedCard") { props, children ->
+        register("ElevatedCard") { props, childScope ->
             ElevatedCard(
                 modifier = resolveModifier(props["modifier"])
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    children.forEach { LuaNodeRenderer(it) }
+                    childScope?.let { LuaScopeComponent(it, this) }
                 }
             }
         }
 
-        // OutlinedCard
-        register("OutlinedCard") { props, children ->
+        register("OutlinedCard") { props, childScope ->
             OutlinedCard(
                 modifier = resolveModifier(props["modifier"])
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    children.forEach { LuaNodeRenderer(it) }
+                    childScope?.let { LuaScopeComponent(it, this) }
                 }
             }
         }
 
         // --- 4. 输入与选择类组件 ---
 
-        // TextField
         register("TextField") { props, _ ->
             val valueProp = props["value"]
             val onValueChange = props["onValueChange"] as? LuaFunction
@@ -203,7 +445,6 @@ object LuaComposeRegistry {
             )
         }
 
-        // OutlinedTextField
         register("OutlinedTextField") { props, _ ->
             val valueProp = props["value"]
             val onValueChange = props["onValueChange"] as? LuaFunction
@@ -220,7 +461,6 @@ object LuaComposeRegistry {
             )
         }
 
-        // Checkbox
         register("Checkbox") { props, _ ->
             val checkedProp = props["checked"]
             val checked = when (checkedProp) {
@@ -235,7 +475,6 @@ object LuaComposeRegistry {
             )
         }
 
-        // Switch
         register("Switch") { props, _ ->
             val checkedProp = props["checked"]
             val checked = when (checkedProp) {
@@ -250,7 +489,6 @@ object LuaComposeRegistry {
             )
         }
 
-        // RadioButton
         register("RadioButton") { props, _ ->
             val selectedProp = props["selected"]
             val selected = when (selectedProp) {
@@ -267,7 +505,6 @@ object LuaComposeRegistry {
 
         // --- 5. 指示器类组件 ---
 
-        // CircularProgressIndicator
         register("CircularProgressIndicator") { props, _ ->
             CircularProgressIndicator(
                 modifier = resolveModifier(props["modifier"]),
@@ -275,7 +512,6 @@ object LuaComposeRegistry {
             )
         }
 
-        // LinearProgressIndicator
         register("LinearProgressIndicator") { props, _ ->
             LinearProgressIndicator(
                 modifier = resolveModifier(props["modifier"]),
@@ -285,7 +521,6 @@ object LuaComposeRegistry {
 
         // --- 6. 图标类组件 ---
 
-        // Icon
         register("Icon") { props, _ ->
             val iconName = props["icon"]?.toString() ?: "info"
             val tint = resolveColor(props["tint"], LocalContentColor.current)
@@ -299,7 +534,6 @@ object LuaComposeRegistry {
 
         // --- 7. 动态列表组件 (Lazy Lists) ---
 
-        // LazyColumn
         register("LazyColumn") { props, _ ->
             val itemsList = props["items"] as? List<*> ?: emptyList<Any?>()
             val itemContent = props["itemContent"] as? LuaFunction
@@ -313,37 +547,22 @@ object LuaComposeRegistry {
                 items(itemsList.size) { index ->
                     val item = itemsList[index]
                     if (itemContent != null) {
-                        // 在渲染项内部，动态构建虚拟节点
-                        val luaActiveScope = LuaBridge.getActiveScope()
-                        val nodesVal = if (luaActiveScope != null) {
-                            // 执行 Lua 模板函数并收集它产生的虚拟节点
-                            val luaInstance = CoerceJavaToLua.coerce(item)
-                            val indexValue = LuaValue.valueOf(index + 1) // 转换为 Lua 的 1 进制索引
-                            itemContent.call(luaInstance, indexValue)
-                            
-                            // 针对单项生成虚拟节点列表
-                            val resTable = luaActiveScope.execute()
-                            resTable
-                        } else {
-                            emptyList()
-                        }
-                        
-                        // 渲染每一项的虚拟节点
-                        nodesVal.forEach { node ->
-                            LuaNodeRenderer(node)
-                        }
+                        val itemScope = remember(index) { LuaScope(itemContent) }
+                        val luaInstance = LuaBridge.javaToLuaValue(item)
+                        val indexValue = LuaValue.valueOf(index + 1)
+                        LuaScopeComponent(itemScope, this, luaInstance, indexValue)
                     }
                 }
             }
         }
     }
 
-    fun register(name: String, renderer: @Composable (props: Map<String, Any?>, children: List<LuaNode>) -> Unit) {
+    fun register(name: String, renderer: @Composable (props: Map<String, Any?>, childScope: LuaScope?) -> Unit) {
         components[name] = renderer
     }
 
     // 解析 Box 内子项的对齐
-    private fun resolveBoxAlignment(alignStr: String): Alignment {
+    fun resolveBoxAlignment(alignStr: String): Alignment {
         return when (alignStr.lowercase()) {
             "center" -> Alignment.Center
             "topstart" -> Alignment.TopStart
@@ -359,7 +578,7 @@ object LuaComposeRegistry {
     }
 
     // 解析 Column 内子项的横向对齐
-    private fun resolveColumnAlignment(alignStr: String): Alignment.Horizontal {
+    fun resolveColumnAlignment(alignStr: String): Alignment.Horizontal {
         return when (alignStr.lowercase()) {
             "center", "centerhorizontally" -> Alignment.CenterHorizontally
             "start" -> Alignment.Start
@@ -369,47 +588,12 @@ object LuaComposeRegistry {
     }
 
     // 解析 Row 内子项的纵向对齐
-    private fun resolveRowAlignment(alignStr: String): Alignment.Vertical {
+    fun resolveRowAlignment(alignStr: String): Alignment.Vertical {
         return when (alignStr.lowercase()) {
             "center", "centervertically" -> Alignment.CenterVertically
             "top" -> Alignment.Top
             "bottom" -> Alignment.Bottom
             else -> Alignment.Top
-        }
-    }
-
-    // 辅助方法：结合 Scope 自动应用子组件的 Alignment 修饰符
-    @Composable
-    private fun renderChildren(children: List<LuaNode>, scope: Any) {
-        children.forEach { child ->
-            val childModifier = resolveModifier(child.props["modifier"])
-            val alignmentStr = (child.props["modifier"] as? LuaModifier)?.alignmentStr
-
-            val finalModifier = if (alignmentStr != null) {
-                when (scope) {
-                    is BoxScope -> {
-                        val alignment = resolveBoxAlignment(alignmentStr)
-                        with(scope) { childModifier.align(alignment) }
-                    }
-                    is ColumnScope -> {
-                        val alignment = resolveColumnAlignment(alignmentStr)
-                        with(scope) { childModifier.align(alignment) }
-                    }
-                    is RowScope -> {
-                        val alignment = resolveRowAlignment(alignmentStr)
-                        with(scope) { childModifier.align(alignment) }
-                    }
-                    else -> childModifier
-                }
-            } else {
-                childModifier
-            }
-
-            // 更新临时的渲染修饰符
-            val tempNode = child.copy(props = child.props.toMutableMap().apply {
-                this["modifier"] = finalModifier
-            })
-            LuaNodeRenderer(tempNode)
         }
     }
 

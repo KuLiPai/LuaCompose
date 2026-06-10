@@ -18,6 +18,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,16 +39,31 @@ import org.luaj.LuaFunction
 import org.luaj.LuaValue
 import java.util.Stack
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector
+import androidx.compose.animation.core.TwoWayConverter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import android.content.Context
+import android.content.res.Configuration
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.rememberCoroutineScope
+
 // --- 1. 递归虚拟节点定义 ---
 data class LuaNode(
     val type: String,
     val props: Map<String, Any?>,
-    val children: List<LuaNode>
+    val childScope: LuaScope? = null
 )
 
 // --- 2. 桥接与作用域管理 ---
 object LuaBridge {
     private val activeScopes = ThreadLocal.withInitial { Stack<LuaScope>() }
+    private val activeNodeLists = ThreadLocal.withInitial { Stack<MutableList<LuaNode>>() }
 
     fun getActiveScope(): LuaScope? {
         val stack = activeScopes.get()!!
@@ -58,12 +79,24 @@ object LuaBridge {
         if (stack.isNotEmpty()) stack.pop()
     }
 
-    // 将 Lua Value 转换成 Java/Kotlin 类型
+    fun getActiveNodeList(): MutableList<LuaNode>? {
+        val stack = activeNodeLists.get()!!
+        return if (stack.isNotEmpty()) stack.peek() else null
+    }
+
+    fun pushActiveNodeList(list: MutableList<LuaNode>) {
+        activeNodeLists.get()!!.push(list)
+    }
+
+    fun popActiveNodeList() {
+        val stack = activeNodeLists.get()!!
+        if (stack.isNotEmpty()) stack.pop()
+    }
+
     fun luaValueToJava(value: LuaValue): Any? {
         return when {
             value.isnil() -> null
             value.isboolean() -> value.toboolean()
-            // 优先处理 Long 并检查范围，防止 Color.Red 等大数值因为低32位为0而被误认为 Int(0)
             value.islong() -> {
                 val l = value.tolong()
                 if (l.toInt().toLong() == l) l.toInt() else l
@@ -72,9 +105,8 @@ object LuaBridge {
             value.isnumber() -> value.todouble()
             value.isstring() -> value.tojstring()
             value.isuserdata() -> value.touserdata()
-            value.isfunction() -> value // 保留函数对象，在 onClick 等事件中回调
+            value.isfunction() -> value
             value.istable() -> {
-                // 如果是 State 对象
                 if (value.get("_isState").toboolean()) {
                     value.get("javaState").touserdata()
                 } else {
@@ -90,7 +122,6 @@ object LuaBridge {
                     }
                 }
             }
-
             else -> value
         }
     }
@@ -110,72 +141,168 @@ object LuaBridge {
         return map
     }
 
-    // 递归解析子节点列表
-    fun parseLuaNodes(resultTable: LuaValue): List<LuaNode> {
-        val list = mutableListOf<LuaNode>()
-        if (!resultTable.istable()) return list
-        val len = resultTable.len().toint()
-        for (i in 1..len) {
-            val nodeVal = resultTable.get(i)
-            if (nodeVal.istable()) {
-                val type = nodeVal.get("type").tojstring()
-                val propsVal = nodeVal.get("props")
-                val props = luaTableToMap(propsVal)
-                val childrenVal = nodeVal.get("children")
-                val children = parseLuaNodes(childrenVal)
-                list.add(LuaNode(type, props, children))
-            }
+    fun javaToLuaValue(value: Any?): LuaValue {
+        return when (value) {
+            null -> LuaValue.NIL
+            is Boolean -> LuaValue.valueOf(value)
+            is Int -> LuaValue.valueOf(value)
+            is Long -> LuaValue.valueOf(value.toDouble())
+            is Double -> LuaValue.valueOf(value)
+            is Float -> LuaValue.valueOf(value.toDouble())
+            is String -> LuaValue.valueOf(value)
+            is LuaValue -> value
+            else -> org.luaj.lib.jse.CoerceJavaToLua.coerce(value)
         }
-        return list
     }
 }
 
-class LuaScope(val contentFunc: LuaFunction) {
+class LuaStateTable(val javaState: LuaState) : org.luaj.LuaTable() {
+    init {
+        set("_isState", LuaValue.valueOf(true))
+        set("javaState", org.luaj.lib.jse.CoerceJavaToLua.coerce(javaState))
+        val meta = org.luaj.LuaTable()
+        meta.set(LuaValue.TOSTRING, object : org.luaj.lib.OneArgFunction() {
+            override fun call(arg: LuaValue): LuaValue {
+                return LuaValue.valueOf(javaState.get().toString())
+            }
+        })
+        setmetatable(meta)
+    }
+
+    override fun get(key: LuaValue): LuaValue {
+        if (key.tojstring() == "value") {
+            return LuaBridge.javaToLuaValue(javaState.get())
+        }
+        return super.get(key)
+    }
+
+    override fun set(key: LuaValue, value: LuaValue) {
+        if (key.tojstring() == "value") {
+            javaState.set(LuaBridge.luaValueToJava(value))
+        } else {
+            super.set(key, value)
+        }
+    }
+}
+
+class LuaScope(var contentFunc: LuaFunction) : org.luaj.LuaTable() {
     private val _recomposeVersion = mutableStateOf(0)
     val recomposeVersion: State<Int> = _recomposeVersion
 
-    private var luaScopeObj: LuaValue? = null
+    var coroutineScope: CoroutineScope? = null
+    var context: Context? = null
+    var density: Density? = null
+    var configuration: Configuration? = null
 
-    fun setLuaScopeObj(obj: LuaValue) {
-        this.luaScopeObj = obj
+    private val states = mutableMapOf<Any, LuaStateTable>()
+    private var statesCount = 0
+
+    private val remembers = mutableMapOf<Any, Any?>()
+    private var remembersCount = 0
+
+    private val childScopes = mutableMapOf<Any, LuaScope>()
+    private var childScopesCount = 0
+
+    private val accessedStates = mutableSetOf<Any>()
+    private val accessedRemembers = mutableSetOf<Any>()
+    private val accessedChildScopes = mutableSetOf<Any>()
+
+    init {
+        set("state", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(scopeObj: LuaValue, initialValue: LuaValue): LuaValue {
+                val actualKey = statesCount++
+                accessedStates.add(actualKey)
+                if (states[actualKey] == null) {
+                    val javaState = LuaState(LuaBridge.luaValueToJava(initialValue), this@LuaScope)
+                    states[actualKey] = LuaStateTable(javaState)
+                }
+                return states[actualKey]!!
+            }
+        })
+
+        set("remember", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(scopeObj: LuaValue, initFunc: LuaValue): LuaValue {
+                val actualKey = remembersCount++
+                accessedRemembers.add(actualKey)
+                if (!remembers.containsKey(actualKey)) {
+                    val initialValue = initFunc.checkfunction().call()
+                    remembers[actualKey] = initialValue
+                }
+                return remembers[actualKey] as LuaValue
+            }
+        })
+
+        set("derivedStateOf", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(scopeObj: LuaValue, computeFunc: LuaValue): LuaValue {
+                val actualKey = statesCount++ 
+                accessedStates.add(actualKey)
+                if (states[actualKey] == null) {
+                    val javaState = LuaDerivedState(computeFunc.checkfunction(), this@LuaScope)
+                    states[actualKey] = LuaStateTable(javaState)
+                }
+                return states[actualKey]!!
+            }
+        })
+    }
+
+    fun getOrCreateChildScope(func: LuaFunction, key: Any? = null): LuaScope {
+        val actualKey = key ?: childScopesCount++
+        accessedChildScopes.add(actualKey)
+        val scope = childScopes.getOrPut(actualKey) { LuaScope(func) }
+        scope.contentFunc = func // 保持闭包最新
+        return scope
     }
 
     fun invalidate() {
         _recomposeVersion.value++
     }
 
-    fun execute(): List<LuaNode> {
-        val luaScope = luaScopeObj ?: return emptyList()
+    fun execute(vararg args: LuaValue): List<LuaNode> {
         LuaBridge.pushActiveScope(this)
-        return try {
-            val resultTable = luaScope.get("run").call(luaScope)
-            LuaBridge.parseLuaNodes(resultTable)
+        val rootNodes = mutableListOf<LuaNode>()
+        LuaBridge.pushActiveNodeList(rootNodes)
+        
+        statesCount = 0
+        remembersCount = 0
+        childScopesCount = 0
+        accessedStates.clear()
+        accessedRemembers.clear()
+        accessedChildScopes.clear()
+        
+        try {
+            contentFunc.invoke(LuaValue.varargsOf(args))
         } catch (e: Exception) {
             e.printStackTrace()
-            // 如果执行出错，生成一个错误信息的 Node 树
-            listOf(
+            rootNodes.add(
                 LuaNode(
                     "Text",
                     mapOf("text" to "Lua Error: ${e.message}", "color" to "#ff0000"),
-                    emptyList()
+                    null
                 )
             )
         } finally {
+            LuaBridge.popActiveNodeList()
             LuaBridge.popActiveScope()
         }
+        
+        // 自动清理不再被访问的状态、记忆值和子作用域 (模拟 Compose 组内存管理)
+        states.keys.retainAll(accessedStates)
+        remembers.keys.retainAll(accessedRemembers)
+        childScopes.keys.retainAll(accessedChildScopes)
+
+        return rootNodes
     }
 }
 
-class LuaState(initialValue: Any?, val scope: LuaScope) {
-    val composeState = mutableStateOf(initialValue)
-    private val dependentScopes = mutableSetOf<LuaScope>()
+open class LuaState(initialValue: Any?, val scope: LuaScope) {
+    open val composeState: State<Any?> = mutableStateOf(initialValue)
+    protected val dependentScopes = mutableSetOf<LuaScope>()
 
     fun registerDependency(scope: LuaScope) {
         dependentScopes.add(scope)
     }
 
-    fun get(): Any? {
-        // 在 Compose 重新渲染获取属性值时，自动收集依赖
+    open fun get(): Any? {
         val active = LuaBridge.getActiveScope()
         if (active != null) {
             dependentScopes.add(active)
@@ -183,167 +310,158 @@ class LuaState(initialValue: Any?, val scope: LuaScope) {
         return composeState.value
     }
 
-    fun set(newValue: Any?) {
-        if (composeState.value != newValue) {
-            composeState.value = newValue
-            // 局部刷新：仅触发依赖此状态的作用域重新执行 Lua
-            for (scope in dependentScopes) {
-                scope.invalidate()
+    open fun set(newValue: Any?) {
+        if (composeState is androidx.compose.runtime.MutableState<Any?>) {
+            val ms = composeState as androidx.compose.runtime.MutableState<Any?>
+            if (ms.value != newValue) {
+                ms.value = newValue
+                for (scope in dependentScopes) {
+                    scope.invalidate()
+                }
             }
         }
     }
 }
 
-// --- 3. 极其优雅的链式 Modifier 封装 (覆盖几乎所有核心 Modifier 方法) ---
+class LuaDerivedState(val computeFunc: LuaFunction, scope: LuaScope) : LuaState(null, scope) {
+    override val composeState = androidx.compose.runtime.derivedStateOf {
+        LuaBridge.luaValueToJava(computeFunc.call())
+    }
+
+    override fun set(newValue: Any?) {
+        // Read-only
+    }
+}
+
+class LuaAnimatableState<T, V : AnimationVector>(
+    initialValue: T,
+    val typeConverter: TwoWayConverter<T, V>,
+    scope: LuaScope
+) : LuaState(initialValue, scope) {
+    
+    var currentSpec: androidx.compose.animation.core.AnimationSpec<T>? = null
+    val animatable = Animatable(initialValue, typeConverter)
+    private var job: Job? = null
+
+    fun animateTo(target: T) {
+        if (animatable.targetValue == target) return
+        job?.cancel()
+        job = scope.coroutineScope?.launch {
+            val block: Animatable<T, V>.() -> Unit = {
+                if (composeState is androidx.compose.runtime.MutableState<Any?>) {
+                    val ms = composeState as androidx.compose.runtime.MutableState<Any?>
+                    ms.value = this.value
+                }
+                for (dep in dependentScopes) {
+                    dep.invalidate()
+                }
+            }
+            if (currentSpec != null) {
+                animatable.animateTo(target, animationSpec = currentSpec!!, block = block)
+            } else {
+                animatable.animateTo(target, block = block)
+            }
+        }
+    }
+    
+    override fun set(newValue: Any?) {
+        // Discard if wrong type, but here we expect correct type mapped from Lua
+        @Suppress("UNCHECKED_CAST")
+        try {
+            animateTo(newValue as T)
+        } catch (e: Exception) { e.printStackTrace() }
+    }
+}
+
+// --- 3. 极其优雅的链式 Modifier 封装 ---
 class LuaModifier(var modifier: Modifier = Modifier) {
     var alignmentStr: String? = null
     var weightVal: Float? = null
 
-    // 基础内边距
-    fun padding(dp: Int): LuaModifier {
-        modifier = modifier.padding(dp.dp)
-        return this
-    }
-
-    fun padding(horizontal: Int, vertical: Int): LuaModifier {
-        modifier = modifier.padding(horizontal.dp, vertical.dp)
-        return this
-    }
-
-    fun padding(start: Int, top: Int, end: Int, bottom: Int): LuaModifier {
-        modifier = modifier.padding(start.dp, top.dp, end.dp, bottom.dp)
-        return this
-    }
-
-    // 填充与尺寸
-    fun fillMaxSize(): LuaModifier {
-        modifier = modifier.fillMaxSize()
-        return this
-    }
-
-    fun fillMaxWidth(): LuaModifier {
-        modifier = modifier.fillMaxWidth()
-        return this
-    }
-
-    fun fillMaxHeight(): LuaModifier {
-        modifier = modifier.fillMaxHeight()
-        return this
-    }
-
-    fun size(size: Int): LuaModifier {
-        modifier = modifier.size(size.dp)
-        return this
-    }
-
-    fun size(width: Int, height: Int): LuaModifier {
-        modifier = modifier.size(width.dp, height.dp)
-        return this
-    }
-
-    fun width(width: Int): LuaModifier {
-        modifier = modifier.width(width.dp)
-        return this
-    }
-
-    fun height(height: Int): LuaModifier {
-        modifier = modifier.height(height.dp)
-        return this
-    }
-
-    fun wrapContentSize(): LuaModifier {
-        modifier = modifier.wrapContentSize()
-        return this
-    }
-
-    // 背景与外观颜色
+    fun padding(dp: Any): LuaModifier { modifier = modifier.padding(resolveDp(dp)); return this }
+    fun padding(horizontal: Any, vertical: Any): LuaModifier { modifier = modifier.padding(resolveDp(horizontal), resolveDp(vertical)); return this }
+    fun padding(start: Any, top: Any, end: Any, bottom: Any): LuaModifier { modifier = modifier.padding(resolveDp(start), resolveDp(top), resolveDp(end), resolveDp(bottom)); return this }
+    fun fillMaxSize(): LuaModifier { modifier = modifier.fillMaxSize(); return this }
+    fun fillMaxWidth(): LuaModifier { modifier = modifier.fillMaxWidth(); return this }
+    fun fillMaxHeight(): LuaModifier { modifier = modifier.fillMaxHeight(); return this }
+    fun size(size: Any): LuaModifier { modifier = modifier.size(resolveDp(size)); return this }
+    fun size(width: Any, height: Any): LuaModifier { modifier = modifier.size(resolveDp(width), resolveDp(height)); return this }
+    fun width(width: Any): LuaModifier { modifier = modifier.width(resolveDp(width)); return this }
+    fun height(height: Any): LuaModifier { modifier = modifier.height(resolveDp(height)); return this }
+    fun wrapContentSize(): LuaModifier { modifier = modifier.wrapContentSize(); return this }
+    
     fun background(colorProp: Any): LuaModifier {
-        try {
-            val color = resolveColor(colorProp)
-            modifier = modifier.background(color)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        try { modifier = modifier.background(resolveColor(colorProp)) } catch (e: Exception) { e.printStackTrace() }
         return this
     }
-
     fun background(colorProp: Any, shape: Shape): LuaModifier {
-        try {
-            val color = resolveColor(colorProp)
-            modifier = modifier.background(color, shape)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        try { modifier = modifier.background(resolveColor(colorProp), shape) } catch (e: Exception) { e.printStackTrace() }
         return this
     }
-
-    fun alpha(alpha: Float): LuaModifier {
-        modifier = modifier.alpha(alpha)
-        return this
-    }
-
-    // 宽高比与偏移量
-    fun aspectRatio(ratio: Float): LuaModifier {
-        modifier = modifier.aspectRatio(ratio)
-        return this
-    }
-
-    fun offset(x: Int, y: Int): LuaModifier {
-        modifier = modifier.offset(x.dp, y.dp)
-        return this
-    }
-
-    // 点击事件修饰符
+    fun alpha(alpha: Float): LuaModifier { modifier = modifier.alpha(alpha); return this }
+    fun aspectRatio(ratio: Float): LuaModifier { modifier = modifier.aspectRatio(ratio); return this }
+    fun offset(x: Any, y: Any): LuaModifier { modifier = modifier.offset(resolveDp(x), resolveDp(y)); return this }
+    
     fun clickable(onClick: LuaFunction): LuaModifier {
         modifier = modifier.clickable {
-            try {
-                onClick.call()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            try { onClick.call() } catch (e: Exception) { e.printStackTrace() }
         }
         return this
     }
+    
+    fun animateContentSize(): LuaModifier {
+        modifier = modifier.animateContentSize()
+        return this
+    }
 
-    // 裁剪形状 (支持圆角和圆形)
+    fun pointerInput(gestures: org.luaj.LuaTable): LuaModifier {
+        val onTap = gestures.get("onTap").takeIf { it.isfunction() }?.checkfunction()
+        val onDoubleTap = gestures.get("onDoubleTap").takeIf { it.isfunction() }?.checkfunction()
+        val onLongPress = gestures.get("onLongPress").takeIf { it.isfunction() }?.checkfunction()
+        val onDrag = gestures.get("onDrag").takeIf { it.isfunction() }?.checkfunction()
+
+        if (onTap != null || onDoubleTap != null || onLongPress != null) {
+            modifier = modifier.pointerInput("tapGestures") {
+                detectTapGestures(
+                    onTap = onTap?.let { fn -> { offset -> fn.call(LuaValue.valueOf(offset.x.toDouble()), LuaValue.valueOf(offset.y.toDouble())) } },
+                    onDoubleTap = onDoubleTap?.let { fn -> { offset -> fn.call(LuaValue.valueOf(offset.x.toDouble()), LuaValue.valueOf(offset.y.toDouble())) } },
+                    onLongPress = onLongPress?.let { fn -> { offset -> fn.call(LuaValue.valueOf(offset.x.toDouble()), LuaValue.valueOf(offset.y.toDouble())) } }
+                )
+            }
+        }
+        
+        if (onDrag != null) {
+            modifier = modifier.pointerInput("dragGestures") {
+                detectDragGestures { change, dragAmount -> 
+                    change.consume()
+                    onDrag.call(LuaValue.valueOf(dragAmount.x.toDouble()), LuaValue.valueOf(dragAmount.y.toDouble()))
+                }
+            }
+        }
+        
+        return this
+    }
+    
     fun clip(shape: String, radius: Int): LuaModifier {
         val clipShape = when (shape.lowercase()) {
             "circle" -> CircleShape
             "rounded" -> RoundedCornerShape(radius.dp)
             else -> null
         }
-        if (clipShape != null) {
-            modifier = modifier.clip(clipShape)
-        }
+        if (clipShape != null) { modifier = modifier.clip(clipShape) }
         return this
     }
-
     fun clip(shape: String): LuaModifier = clip(shape, 0)
-
-    // 边框修饰符
+    
     fun border(width: Int, color: Any): LuaModifier {
-        try {
-            val resolvedColor = resolveColor(color)
-            modifier = modifier.border(width.dp, resolvedColor)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        try { modifier = modifier.border(width.dp, resolveColor(color)) } catch (e: Exception) { e.printStackTrace() }
         return this
     }
-
-    // 容器专属：子项对齐与权重 (延迟解析应用)
-    fun align(alignStr: String): LuaModifier {
-        this.alignmentStr = alignStr
-        return this
-    }
-
-    fun weight(weight: Float): LuaModifier {
-        this.weightVal = weight
-        return this
-    }
+    
+    fun align(alignStr: String): LuaModifier { this.alignmentStr = alignStr; return this }
+    fun weight(weight: Float): LuaModifier { this.weightVal = weight; return this }
 }
 
-// 解析 Modifier 属性
 fun resolveModifier(prop: Any?): Modifier {
     return when (prop) {
         is LuaModifier -> prop.modifier
@@ -352,70 +470,98 @@ fun resolveModifier(prop: Any?): Modifier {
     }
 }
 
-// 解析颜色属性
 fun resolveColor(colorProp: Any?, defaultColor: Color = Color.Unspecified): Color {
-    Log.d("11111", colorProp.toString())
-
     return when (colorProp) {
         null -> defaultColor
-        // 2. 如果已经是 Color 对象（包括从 Kotlin 传过来的，或者从 Lua 传回的 Userdata）
         is Color -> colorProp
-
-        // 3. 处理数字（处理 Lua 中的颜色常数或直接传的 hex 数字）
         is Long -> {
-
-            if (colorProp in 0L..4294967295L) {
-                Color(colorProp)
-            } else {
-
-                Color(colorProp.toULong())
-            }
+            if (colorProp in 0L..4294967295L) { Color(colorProp) } else { Color(colorProp.toULong()) }
         }
-
-        // 4. 处理字符串（如 "#FFFFFF" 或 "red"）
         else -> {
             val colorStr = colorProp.toString()
             try {
-                // 如果是纯数字字符串，先尝试转成长整型
                 val longVal = colorStr.toLongOrNull()
-                if (longVal != null) {
-                    resolveColor(longVal, defaultColor)
-                } else {
-                    Color(colorStr.toColorInt())
-                }
-            } catch (e: Exception) {
-                defaultColor
-            }
+                if (longVal != null) { resolveColor(longVal, defaultColor) } else { Color(colorStr.toColorInt()) }
+            } catch (e: Exception) { defaultColor }
         }
+    }
+}
+
+fun resolveDp(value: Any?): androidx.compose.ui.unit.Dp {
+    return when (value) {
+        is androidx.compose.ui.unit.Dp -> value
+        is Number -> value.toFloat().dp
+        is String -> value.toFloatOrNull()?.dp ?: 0.dp
+        else -> 0.dp
+    }
+}
+
+fun resolveSp(value: Any?): androidx.compose.ui.unit.TextUnit {
+    return when (value) {
+        is androidx.compose.ui.unit.TextUnit -> value
+        is Number -> value.toFloat().sp
+        is String -> value.toFloatOrNull()?.sp ?: androidx.compose.ui.unit.TextUnit.Unspecified
+        else -> androidx.compose.ui.unit.TextUnit.Unspecified
     }
 }
 
 // --- 4. Compose 核心入口渲染器 ---
 @Composable
-fun LuaScopeComponent(scope: LuaScope) {
-    val version by scope.recomposeVersion
+fun LuaScopeComponent(scope: LuaScope, parentComposeScope: Any? = null, vararg args: LuaValue) {
+    scope.coroutineScope = rememberCoroutineScope()
+    scope.context = LocalContext.current
+    scope.density = LocalDensity.current
+    scope.configuration = LocalConfiguration.current
 
-    val nodes = remember(version) {
-        scope.execute()
-    }
+    val version by scope.recomposeVersion
+    val nodes = remember(version, *args) { scope.execute(*args) }
 
     for (node in nodes) {
-        LuaNodeRenderer(node)
+        LuaNodeRenderer(node, parentComposeScope)
     }
 }
 
 @Composable
-fun LuaNodeRenderer(node: LuaNode) {
-    // 统一通过全局注册表进行多态分发
+fun LuaNodeRenderer(node: LuaNode, parentComposeScope: Any? = null) {
+    val childModifier = resolveModifier(node.props["modifier"])
+    val alignmentStr = (node.props["modifier"] as? LuaModifier)?.alignmentStr
+    val weightVal = (node.props["modifier"] as? LuaModifier)?.weightVal
+
+    var finalModifier = if (alignmentStr != null && parentComposeScope != null) {
+        when (parentComposeScope) {
+            is androidx.compose.foundation.layout.BoxScope -> {
+                val alignment = LuaComposeRegistry.resolveBoxAlignment(alignmentStr)
+                with(parentComposeScope) { childModifier.align(alignment) }
+            }
+            is androidx.compose.foundation.layout.ColumnScope -> {
+                val alignment = LuaComposeRegistry.resolveColumnAlignment(alignmentStr)
+                with(parentComposeScope) { childModifier.align(alignment) }
+            }
+            is androidx.compose.foundation.layout.RowScope -> {
+                val alignment = LuaComposeRegistry.resolveRowAlignment(alignmentStr)
+                with(parentComposeScope) { childModifier.align(alignment) }
+            }
+            else -> childModifier
+        }
+    } else {
+        childModifier
+    }
+
+    if (weightVal != null && parentComposeScope != null) {
+        finalModifier = when (parentComposeScope) {
+            is androidx.compose.foundation.layout.ColumnScope -> with(parentComposeScope) { finalModifier.weight(weightVal) }
+            is androidx.compose.foundation.layout.RowScope -> with(parentComposeScope) { finalModifier.weight(weightVal) }
+            else -> finalModifier
+        }
+    }
+
+    val finalProps = node.props.toMutableMap()
+    finalProps["modifier"] = finalModifier
+
     val renderer = LuaComposeRegistry.components[node.type]
     if (renderer != null) {
-        renderer(node.props, node.children)
+        renderer(finalProps, node.childScope)
     } else {
-        // 如果未注册，显示明显的错误提示
-        Text(
-            "组件 [${node.type}] 未在注册表注册",
-            color = Color.Red,
-            modifier = Modifier.padding(8.dp)
-        )
+        Text("组件 [${node.type}] 未在注册表注册", color = Color.Red, modifier = Modifier.padding(8.dp))
     }
 }

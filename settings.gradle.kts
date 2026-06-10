@@ -24,4 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "luaCompose"
 include(":app")
- 
+include(":androlua")
+include(":compose")

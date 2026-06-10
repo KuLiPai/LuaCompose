@@ -1,4 +1,4 @@
-# luaCompose 📱🎭
+# luaCompose 📱
 
 > **🚨 注意：本项目目前处于 `1.0.0-experimental` 阶段，属于不稳定的实验性、开发中版本。API 接口与功能实现可能会有较大变动。**
 

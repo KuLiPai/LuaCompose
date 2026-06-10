@@ -35,7 +35,7 @@ local function createState(initialValue, scope)
   -- 实例化 Kotlin 侧的 LuaState
   local s = {
     _isState = true,
-    javaState = luajava.newInstance("com.kulipai.luacompose.LuaState", initialValue, scope),
+    javaState = luajava.newInstance("com.kulipai.luacompose.compose.LuaState", initialValue, scope),
   }
   
   function s:get()

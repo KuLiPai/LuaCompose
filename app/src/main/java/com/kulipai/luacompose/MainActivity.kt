@@ -12,6 +12,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.kulipai.luacompose.compose.LuaModifier
+import com.kulipai.luacompose.compose.LuaScope
+import com.kulipai.luacompose.compose.LuaScopeComponent
 import com.kulipai.luacompose.ui.theme.LuaComposeTheme
 import org.luaj.Globals
 import org.luaj.LuaFunction
@@ -39,7 +42,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun LuaAppRunner(context: Context) {
-    var reloadTrigger by remember { mutableStateOf(0) }
+    var reloadTrigger by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var rootScope by remember { mutableStateOf<LuaScope?>(null) }
 

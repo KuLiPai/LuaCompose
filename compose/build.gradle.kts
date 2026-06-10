@@ -1,37 +1,24 @@
 plugins {
-    alias(libs.plugins.android.application)
+    alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
 }
 
 android {
-    namespace = "com.kulipai.luacompose"
+    namespace = "com.kulipai.luacompose.compose"
     compileSdk {
         version = release(37)
     }
 
     defaultConfig {
-        applicationId = "com.kulipai.luacompose"
         minSdk = 24
-        targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0-experimental"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    }
-
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
+
     buildFeatures {
         compose = true
     }
@@ -53,8 +40,6 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
-
     implementation(project(":androlua"))
 
-    implementation(project(":compose"))
 }

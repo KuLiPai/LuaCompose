@@ -24,8 +24,8 @@ import java.util.Map;
 
 public class JavaClass extends JavaInstance implements CoerceJavaToLua.Coercion {
     static final HashMap<LuaValue, LuaValue> i = new HashMap<>();
-    static final Map<Class<?>, JavaClass> j = Collections.synchronizedMap(new HashMap());
-    static final Map<String, JavaClass> k = Collections.synchronizedMap(new HashMap());
+    static final Map<Class<?>, JavaClass> j = Collections.<Object, Object>synchronizedMap(new HashMap());
+    static final Map<String, JavaClass> k = Collections.<Object, Object>synchronizedMap(new HashMap());
     static final LuaValue l = LuaValue.valueOf("new");
 
     static {

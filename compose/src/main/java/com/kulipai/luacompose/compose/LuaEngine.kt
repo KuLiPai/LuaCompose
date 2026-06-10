@@ -1,26 +1,36 @@
-package com.kulipai.luacompose
+package com.kulipai.luacompose.compose
 
-import android.content.Context
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
-import org.luaj.Globals
+import androidx.core.graphics.toColorInt
 import org.luaj.LuaFunction
 import org.luaj.LuaValue
-import org.luaj.lib.ZeroArgFunction
-import org.luaj.lib.jse.CoerceJavaToLua
-import org.luaj.lib.jse.JsePlatform
-import java.io.File
 import java.util.Stack
 
 // --- 1. 递归虚拟节点定义 ---
@@ -53,8 +63,12 @@ object LuaBridge {
         return when {
             value.isnil() -> null
             value.isboolean() -> value.toboolean()
+            // 优先处理 Long 并检查范围，防止 Color.Red 等大数值因为低32位为0而被误认为 Int(0)
+            value.islong() -> {
+                val l = value.tolong()
+                if (l.toInt().toLong() == l) l.toInt() else l
+            }
             value.isint() -> value.toint()
-            value.islong() -> value.tolong()
             value.isnumber() -> value.todouble()
             value.isstring() -> value.tojstring()
             value.isuserdata() -> value.touserdata()
@@ -76,6 +90,7 @@ object LuaBridge {
                     }
                 }
             }
+
             else -> value
         }
     }
@@ -138,7 +153,13 @@ class LuaScope(val contentFunc: LuaFunction) {
         } catch (e: Exception) {
             e.printStackTrace()
             // 如果执行出错，生成一个错误信息的 Node 树
-            listOf(LuaNode("Text", mapOf("text" to "Lua Error: ${e.message}", "color" to "#ff0000"), emptyList()))
+            listOf(
+                LuaNode(
+                    "Text",
+                    mapOf("text" to "Lua Error: ${e.message}", "color" to "#ff0000"),
+                    emptyList()
+                )
+            )
         } finally {
             LuaBridge.popActiveScope()
         }
@@ -236,10 +257,20 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     // 背景与外观颜色
-    fun background(colorHex: String): LuaModifier {
+    fun background(colorProp: Any): LuaModifier {
         try {
-            val color = Color(android.graphics.Color.parseColor(colorHex))
+            val color = resolveColor(colorProp)
             modifier = modifier.background(color)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return this
+    }
+
+    fun background(colorProp: Any, shape: Shape): LuaModifier {
+        try {
+            val color = resolveColor(colorProp)
+            modifier = modifier.background(color, shape)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -290,10 +321,10 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     fun clip(shape: String): LuaModifier = clip(shape, 0)
 
     // 边框修饰符
-    fun border(width: Int, colorHex: String): LuaModifier {
+    fun border(width: Int, color: Any): LuaModifier {
         try {
-            val color = Color(android.graphics.Color.parseColor(colorHex))
-            modifier = modifier.border(width.dp, color)
+            val resolvedColor = resolveColor(color)
+            modifier = modifier.border(width.dp, resolvedColor)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -323,12 +354,39 @@ fun resolveModifier(prop: Any?): Modifier {
 
 // 解析颜色属性
 fun resolveColor(colorProp: Any?, defaultColor: Color = Color.Unspecified): Color {
-    if (colorProp == null) return defaultColor
-    val colorStr = colorProp.toString()
-    return try {
-        Color(android.graphics.Color.parseColor(colorStr))
-    } catch (e: Exception) {
-        defaultColor
+    Log.d("11111", colorProp.toString())
+
+    return when (colorProp) {
+        null -> defaultColor
+        // 2. 如果已经是 Color 对象（包括从 Kotlin 传过来的，或者从 Lua 传回的 Userdata）
+        is Color -> colorProp
+
+        // 3. 处理数字（处理 Lua 中的颜色常数或直接传的 hex 数字）
+        is Long -> {
+
+            if (colorProp in 0L..4294967295L) {
+                Color(colorProp)
+            } else {
+
+                Color(colorProp.toULong())
+            }
+        }
+
+        // 4. 处理字符串（如 "#FFFFFF" 或 "red"）
+        else -> {
+            val colorStr = colorProp.toString()
+            try {
+                // 如果是纯数字字符串，先尝试转成长整型
+                val longVal = colorStr.toLongOrNull()
+                if (longVal != null) {
+                    resolveColor(longVal, defaultColor)
+                } else {
+                    Color(colorStr.toColorInt())
+                }
+            } catch (e: Exception) {
+                defaultColor
+            }
+        }
     }
 }
 
@@ -354,6 +412,10 @@ fun LuaNodeRenderer(node: LuaNode) {
         renderer(node.props, node.children)
     } else {
         // 如果未注册，显示明显的错误提示
-        Text("组件 [${node.type}] 未在注册表注册", color = Color.Red, modifier = Modifier.padding(8.dp))
+        Text(
+            "组件 [${node.type}] 未在注册表注册",
+            color = Color.Red,
+            modifier = Modifier.padding(8.dp)
+        )
     }
 }

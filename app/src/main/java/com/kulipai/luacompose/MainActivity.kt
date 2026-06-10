@@ -91,7 +91,9 @@ fun LuaAppRunner(context: Context) {
                 )
             } else {
                 rootScope?.let {
-                    LuaScopeComponent(it)
+                    key(rootScope) {
+                        LuaScopeComponent(it)
+                    }
                 } ?: Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center

@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kulipai.luacompose.compose.LuaBridge
 import com.kulipai.luacompose.compose.LuaComposeRegistry
@@ -146,6 +147,8 @@ class FoundationPlugin : LuaComposePlugin {
         })
         luaTable.set("CircleShape", LuaBridge.javaToLuaValue(CircleShape))
 
+
+        // -------------- Arrangement ------------------
         val arrangementTable = LuaTable()
         arrangementTable.set("Top", LuaBridge.javaToLuaValue(Arrangement.Top))
         arrangementTable.set("Center", LuaBridge.javaToLuaValue(Arrangement.Center))
@@ -177,7 +180,7 @@ class FoundationPlugin : LuaComposePlugin {
 
         luaTable.set("Arrangement", arrangementTable)
 
-
+        // -------------- Alignment ------------------
         val alignmentTable = LuaTable()
         alignmentTable.set("TopStart",LuaBridge.javaToLuaValue(Alignment.TopStart))
         alignmentTable.set("TopCenter",LuaBridge.javaToLuaValue(Alignment.TopCenter))
@@ -199,8 +202,51 @@ class FoundationPlugin : LuaComposePlugin {
         alignmentTable.set("CenterHorizontally",LuaBridge.javaToLuaValue(Alignment.CenterHorizontally))
         alignmentTable.set("End",LuaBridge.javaToLuaValue(Alignment.End))
 
-
         luaTable.set("Alignment", alignmentTable)
+
+        // -------------- FontWeight ------------------
+
+        val fontWeightTable = LuaTable()
+        /** [Thin] */
+        fontWeightTable.set("W100", LuaBridge.javaToLuaValue(FontWeight.W100))
+        /** [ExtraLight] */
+        fontWeightTable.set("W200", LuaBridge.javaToLuaValue(FontWeight.W200))
+        /** [Light] */
+        fontWeightTable.set("W300", LuaBridge.javaToLuaValue(FontWeight.W300))
+        /** [Normal] / regular / plain */
+        fontWeightTable.set("W400", LuaBridge.javaToLuaValue(FontWeight.W400))
+        /** [Medium] */
+        fontWeightTable.set("W500", LuaBridge.javaToLuaValue(FontWeight.W500))
+        /** [SemiBold] */
+        fontWeightTable.set("W600", LuaBridge.javaToLuaValue(FontWeight.W600))
+        /** [Bold] */
+        fontWeightTable.set("W700", LuaBridge.javaToLuaValue(FontWeight.W700))
+        /** [ExtraBold] */
+        fontWeightTable.set("W800", LuaBridge.javaToLuaValue(FontWeight.W800))
+        /** [Black] */
+        fontWeightTable.set("W900", LuaBridge.javaToLuaValue(FontWeight.W900))
+        /** Alias for [W100] */
+        fontWeightTable.set("Thin", LuaBridge.javaToLuaValue(FontWeight.Thin))
+        /** Alias for [W200] */
+        fontWeightTable.set("ExtraLight", LuaBridge.javaToLuaValue(FontWeight.ExtraLight))
+        /** Alias for [W300] */
+        fontWeightTable.set("Light", LuaBridge.javaToLuaValue(FontWeight.Light))
+        /** The default font weight - alias for [W400] */
+        fontWeightTable.set("Normal", LuaBridge.javaToLuaValue(FontWeight.Normal))
+        /** Alias for [W500] */
+        fontWeightTable.set("Medium", LuaBridge.javaToLuaValue(FontWeight.Medium))
+        /** Alias for [W600] */
+        fontWeightTable.set("SemiBold", LuaBridge.javaToLuaValue(FontWeight.SemiBold))
+        /** A commonly used font weight that is heavier than normal - alias for [W700] */
+        fontWeightTable.set("Bold", LuaBridge.javaToLuaValue(FontWeight.Bold))
+        /** Alias for [W800] */
+        fontWeightTable.set("ExtraBold", LuaBridge.javaToLuaValue(FontWeight.ExtraBold))
+        /** Alias for [W900] */
+        fontWeightTable.set("Black", LuaBridge.javaToLuaValue(FontWeight.Black))
+
+        luaTable.set("FontWeight", fontWeightTable)
+
+
 
 
 

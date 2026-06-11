@@ -107,13 +107,25 @@ class Material3Plugin : LuaComposePlugin {
                 }
             }
 
-            val fontWeightProp = props["fontWeight"]?.toString()?.lowercase()
-            val fontWeight = when (fontWeightProp) {
-                "bold" -> FontWeight.Bold
-                "medium" -> FontWeight.Medium
-                "light" -> FontWeight.Light
-                else -> null
+            val fontWeight = when (val fontWeightProp = props["fontWeight"]) {
+                is FontWeight -> {
+                    fontWeightProp
+                }
+
+                is String -> {
+                    when (fontWeightProp.lowercase()) {
+                        "bold" -> FontWeight.Bold
+                        "medium" -> FontWeight.Medium
+                        "light" -> FontWeight.Light
+                        else -> null
+                    }
+                }
+
+                else -> {
+                    null
+                }
             }
+
 
             Text(
                 text = textVal,

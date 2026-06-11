@@ -1,6 +1,9 @@
 package com.kulipai.luacompose.compose
 
 import android.content.Context
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.Typography
+import androidx.compose.material3.Shapes
 import android.content.res.Configuration
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector
@@ -12,6 +15,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.luaj.LuaFunction
+import org.luaj.LuaTable
 import org.luaj.LuaValue
 import java.util.Stack
 
@@ -116,14 +120,14 @@ object LuaBridge {
     }
 }
 
-class LuaStateTable(val javaState: LuaState) : org.luaj.LuaTable() {
+class LuaStateTable(val javaState: LuaState) : LuaTable() {
     init {
-        set("_isState", LuaValue.valueOf(true))
+        set("_isState", valueOf(true))
         set("javaState", org.luaj.lib.jse.CoerceJavaToLua.coerce(javaState))
-        val meta = org.luaj.LuaTable()
-        meta.set(LuaValue.TOSTRING, object : org.luaj.lib.OneArgFunction() {
+        val meta = LuaTable()
+        meta.set(TOSTRING, object : org.luaj.lib.OneArgFunction() {
             override fun call(arg: LuaValue): LuaValue {
-                return LuaValue.valueOf(javaState.get().toString())
+                return valueOf(javaState.get().toString())
             }
         })
         setmetatable(meta)
@@ -145,7 +149,7 @@ class LuaStateTable(val javaState: LuaState) : org.luaj.LuaTable() {
     }
 }
 
-class LuaScope(var contentFunc: LuaFunction) : org.luaj.LuaTable() {
+class LuaScope(var contentFunc: LuaFunction) : LuaTable() {
     private val _recomposeVersion = mutableStateOf(0)
     val recomposeVersion: State<Int> = _recomposeVersion
 
@@ -153,6 +157,10 @@ class LuaScope(var contentFunc: LuaFunction) : org.luaj.LuaTable() {
     var context: Context? = null
     var density: Density? = null
     var configuration: Configuration? = null
+    
+    var colorScheme: ColorScheme? = null
+    var typography: Typography? = null
+    var shapes: Shapes? = null
 
     private val states = mutableMapOf<Any, LuaStateTable>()
     private var statesCount = 0

@@ -1,17 +1,17 @@
 package com.kulipai.luacompose.compose
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import org.luaj.LuaValue
-import org.luaj.LuaTable
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import com.kulipai.luacompose.compose.plugins.FoundationPlugin
 import com.kulipai.luacompose.compose.plugins.LuaComposePlugin
 import com.kulipai.luacompose.compose.plugins.Material3Plugin
+import org.luaj.LuaTable
+import org.luaj.LuaValue
 
 class LuaPath(val path: Path = Path()) : LuaTable() {
     init {
@@ -94,8 +94,10 @@ class LuaDrawScope(val drawScope: DrawScope) : LuaTable() {
             override fun call(args: LuaValue): LuaValue {
                 val color = resolveColor(args.get("color"))
                 val radius = args.get("radius").optdouble(50.0).toFloat()
-                val centerX = args.get("centerX").let { if (it.isnil()) drawScope.center.x else it.tofloat() }
-                val centerY = args.get("centerY").let { if (it.isnil()) drawScope.center.y else it.tofloat() }
+                val centerX =
+                    args.get("centerX").let { if (it.isnil()) drawScope.center.x else it.tofloat() }
+                val centerY =
+                    args.get("centerY").let { if (it.isnil()) drawScope.center.y else it.tofloat() }
                 drawScope.drawCircle(
                     color = color,
                     radius = radius,
@@ -121,7 +123,8 @@ class LuaDrawScope(val drawScope: DrawScope) : LuaTable() {
 }
 
 object LuaComposeRegistry {
-    val components = mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: LuaScope?) -> Unit>()
+    val components =
+        mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: LuaScope?) -> Unit>()
     val plugins = mutableListOf<LuaComposePlugin>()
 
     init {
@@ -138,59 +141,126 @@ object LuaComposeRegistry {
     }
 
     fun resolveVerticalArrangement(prop: Any?): Arrangement.Vertical {
-        return when (prop?.toString()?.lowercase()) {
-            "top" -> Arrangement.Top
-            "bottom" -> Arrangement.Bottom
-            "center" -> Arrangement.Center
-            "spacebetween" -> Arrangement.SpaceBetween
-            "spacearound" -> Arrangement.SpaceAround
-            "spaceevenly" -> Arrangement.SpaceEvenly
-            else -> Arrangement.Top
+
+        return when (prop) {
+            is Arrangement.Vertical -> {
+                prop
+            }
+
+            is String -> {
+                when (prop.lowercase()) {
+                    "top" -> Arrangement.Top
+                    "bottom" -> Arrangement.Bottom
+                    "center" -> Arrangement.Center
+                    "spacebetween" -> Arrangement.SpaceBetween
+                    "spacearound" -> Arrangement.SpaceAround
+                    "spaceevenly" -> Arrangement.SpaceEvenly
+                    else -> Arrangement.Top
+                }
+            }
+
+
+            else -> {
+                Arrangement.Top
+            }
         }
+
     }
 
     fun resolveHorizontalArrangement(prop: Any?): Arrangement.Horizontal {
-        return when (prop?.toString()?.lowercase()) {
-            "start" -> Arrangement.Start
-            "end" -> Arrangement.End
-            "center" -> Arrangement.Center
-            "spacebetween" -> Arrangement.SpaceBetween
-            "spacearound" -> Arrangement.SpaceAround
-            "spaceevenly" -> Arrangement.SpaceEvenly
-            else -> Arrangement.Start
+
+        return when (prop) {
+            is Arrangement.Horizontal -> {
+                prop
+            }
+
+            is String -> {
+                when (prop.lowercase()) {
+                    "start" -> Arrangement.Start
+                    "end" -> Arrangement.End
+                    "center" -> Arrangement.Center
+                    "spacebetween" -> Arrangement.SpaceBetween
+                    "spacearound" -> Arrangement.SpaceAround
+                    "spaceevenly" -> Arrangement.SpaceEvenly
+                    else -> Arrangement.Start
+                }
+            }
+
+
+            else -> {
+                Arrangement.Start
+            }
         }
+
+
     }
 
     fun resolveHorizontalAlignment(prop: Any?): Alignment.Horizontal {
-        return when (prop?.toString()?.lowercase()) {
-            "start" -> Alignment.Start
-            "end" -> Alignment.End
-            "center", "centerhorizontally" -> Alignment.CenterHorizontally
-            else -> Alignment.Start
+
+        return when (prop) {
+            is Alignment.Horizontal -> {
+                prop
+            }
+            is String -> {
+                when (prop.lowercase()) {
+                    "start" -> Alignment.Start
+                    "end" -> Alignment.End
+                    "center", "centerhorizontally" -> Alignment.CenterHorizontally
+                    else -> Alignment.Start
+                }}
+
+
+            else -> {
+                Alignment.Start
+            }
         }
+
     }
 
     fun resolveVerticalAlignment(prop: Any?): Alignment.Vertical {
-        return when (prop?.toString()?.lowercase()) {
-            "top" -> Alignment.Top
-            "bottom" -> Alignment.Bottom
-            "center", "centervertically" -> Alignment.CenterVertically
-            else -> Alignment.Top
+        return when (prop) {
+            is Alignment.Vertical -> {
+                prop
+            }
+            is String -> {
+                when (prop.lowercase()) {
+                    "top" -> Alignment.Top
+                    "bottom" -> Alignment.Bottom
+                    "center", "centervertically" -> Alignment.CenterVertically
+                    else -> Alignment.Top
+                }}
+
+
+            else -> {
+                Alignment.Top
+            }
         }
     }
 
     fun resolveAlignment(prop: Any?): Alignment {
-        return when (prop?.toString()?.lowercase()) {
-            "topstart" -> Alignment.TopStart
-            "topcenter" -> Alignment.TopCenter
-            "topend" -> Alignment.TopEnd
-            "centerstart" -> Alignment.CenterStart
-            "center" -> Alignment.Center
-            "centerend" -> Alignment.CenterEnd
-            "bottomstart" -> Alignment.BottomStart
-            "bottomcenter" -> Alignment.BottomCenter
-            "bottomend" -> Alignment.BottomEnd
-            else -> Alignment.TopStart
+
+        return when (prop) {
+            is Alignment -> {
+                prop
+            }
+            is String -> {
+                when (prop.lowercase()) {
+                    "topstart" -> Alignment.TopStart
+                    "topcenter" -> Alignment.TopCenter
+                    "topend" -> Alignment.TopEnd
+                    "centerstart" -> Alignment.CenterStart
+                    "center" -> Alignment.Center
+                    "centerend" -> Alignment.CenterEnd
+                    "bottomstart" -> Alignment.BottomStart
+                    "bottomcenter" -> Alignment.BottomCenter
+                    "bottomend" -> Alignment.BottomEnd
+                    else -> Alignment.TopStart
+                }}
+
+
+            else -> {
+                Alignment.TopStart
+            }
         }
     }
 

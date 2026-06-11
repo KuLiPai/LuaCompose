@@ -27,6 +27,8 @@ class LuaComposeLib : TwoArgFunction() {
         val composeTable = LuaTable()
         env.set("compose", composeTable)
 
+
+
         composeTable.set("dp", object : OneArgFunction() {
             override fun call(arg: LuaValue): LuaValue {
                 return LuaBridge.javaToLuaValue(resolveDp(LuaBridge.luaValueToJava(arg)))
@@ -37,31 +39,34 @@ class LuaComposeLib : TwoArgFunction() {
                 return LuaBridge.javaToLuaValue(resolveSp(LuaBridge.luaValueToJava(arg)))
             }
         })
-        
+
         composeTable.set("setContent", object : OneArgFunction() {
             override fun call(func: LuaValue): LuaValue {
                 rootContentFunc = func.checkfunction()
-                return LuaValue.NIL
+                return NIL
             }
         })
 
         composeTable.set("state", object : OneArgFunction() {
             override fun call(initialValue: LuaValue): LuaValue {
-                val scope = LuaBridge.getActiveScope() ?: throw RuntimeException("compose.state() 必须在 Compose 上下文中调用")
+                val scope = LuaBridge.getActiveScope()
+                    ?: throw RuntimeException("compose.state() 必须在 Compose 上下文中调用")
                 return scope.get("state").call(scope, initialValue)
             }
         })
 
         composeTable.set("remember", object : OneArgFunction() {
             override fun call(initFunc: LuaValue): LuaValue {
-                val scope = LuaBridge.getActiveScope() ?: throw RuntimeException("compose.remember() 必须在 Compose 上下文中调用")
+                val scope = LuaBridge.getActiveScope()
+                    ?: throw RuntimeException("compose.remember() 必须在 Compose 上下文中调用")
                 return scope.get("remember").call(scope, initFunc)
             }
         })
 
         composeTable.set("derivedStateOf", object : OneArgFunction() {
             override fun call(computeFunc: LuaValue): LuaValue {
-                val scope = LuaBridge.getActiveScope() ?: throw RuntimeException("compose.derivedStateOf() 必须在 Compose 上下文中调用")
+                val scope = LuaBridge.getActiveScope()
+                    ?: throw RuntimeException("compose.derivedStateOf() 必须在 Compose 上下文中调用")
                 return scope.get("derivedStateOf").call(scope, computeFunc)
             }
         })
@@ -79,7 +84,7 @@ class LuaComposeLib : TwoArgFunction() {
             }
         })
 
-                composeTable.set("tween", object : org.luaj.lib.VarArgFunction() {
+        composeTable.set("tween", object : org.luaj.lib.VarArgFunction() {
             override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
                 val duration = args.optint(1, 300)
                 val delay = args.optint(2, 0)
@@ -117,9 +122,11 @@ class LuaComposeLib : TwoArgFunction() {
                         animState = LuaStateTable(state)
                         activeScope.set(key, animState)
                     }
-                    val javaState = (animState as LuaStateTable).javaState as LuaAnimatableState<Float, AnimationVector1D>
+                    val javaState =
+                        (animState as LuaStateTable).javaState as LuaAnimatableState<Float, AnimationVector1D>
                     if (spec.istable()) {
-                        javaState.currentSpec = parseAnimationSpec<Float>(spec.checktable()) as AnimationSpec<Float>
+                        javaState.currentSpec =
+                            parseAnimationSpec<Float>(spec.checktable()) as AnimationSpec<Float>
                     }
                     javaState.animateTo(target)
                     return animState
@@ -140,14 +147,16 @@ class LuaComposeLib : TwoArgFunction() {
                         animState = LuaStateTable(state)
                         activeScope.set(key, animState)
                     }
-                    val javaState = (animState as LuaStateTable).javaState as LuaAnimatableState<Int, AnimationVector1D>
+                    val javaState =
+                        (animState as LuaStateTable).javaState as LuaAnimatableState<Int, AnimationVector1D>
                     if (spec.istable()) {
-                        javaState.currentSpec = parseAnimationSpec<Int>(spec.checktable()) as AnimationSpec<Int>
+                        javaState.currentSpec =
+                            parseAnimationSpec<Int>(spec.checktable()) as AnimationSpec<Int>
                     }
                     javaState.animateTo(target)
                     return animState
                 }
-                return LuaValue.NIL
+                return NIL
             }
         })
 
@@ -163,14 +172,16 @@ class LuaComposeLib : TwoArgFunction() {
                         animState = LuaStateTable(state)
                         activeScope.set(key, animState)
                     }
-                    val javaState = (animState as LuaStateTable).javaState as LuaAnimatableState<Dp, AnimationVector1D>
+                    val javaState =
+                        (animState as LuaStateTable).javaState as LuaAnimatableState<Dp, AnimationVector1D>
                     if (spec.istable()) {
-                        javaState.currentSpec = parseAnimationSpec<Dp>(spec.checktable()) as AnimationSpec<Dp>
+                        javaState.currentSpec =
+                            parseAnimationSpec<Dp>(spec.checktable()) as AnimationSpec<Dp>
                     }
                     javaState.animateTo(target)
                     return animState
                 }
-                return LuaValue.NIL
+                return NIL
             }
         })
 
@@ -182,18 +193,24 @@ class LuaComposeLib : TwoArgFunction() {
                     val key = "anim_color_\${targetValue.hashCode()}"
                     var animState = activeScope.get(key)
                     if (animState.isnil()) {
-                        val state = LuaAnimatableState(target, Color.VectorConverter(target.colorSpace), activeScope)
+                        val state = LuaAnimatableState(
+                            target,
+                            Color.VectorConverter(target.colorSpace),
+                            activeScope
+                        )
                         animState = LuaStateTable(state)
                         activeScope.set(key, animState)
                     }
-                    val javaState = (animState as LuaStateTable).javaState as LuaAnimatableState<Color, AnimationVector4D>
+                    val javaState =
+                        (animState as LuaStateTable).javaState as LuaAnimatableState<Color, AnimationVector4D>
                     if (spec.istable()) {
-                        javaState.currentSpec = parseAnimationSpec<Color>(spec.checktable()) as AnimationSpec<Color>
+                        javaState.currentSpec =
+                            parseAnimationSpec<Color>(spec.checktable()) as AnimationSpec<Color>
                     }
                     javaState.animateTo(target)
                     return animState
                 }
-                return LuaValue.NIL
+                return NIL
             }
         })
 
@@ -213,7 +230,7 @@ class LuaComposeLib : TwoArgFunction() {
                         }
                     }
                 }
-                return LuaValue.NIL
+                return NIL
             }
         })
 
@@ -223,7 +240,7 @@ class LuaComposeLib : TwoArgFunction() {
                 if (activeScope != null) {
                     val key = "effect_\${effectFunc.hashCode()}"
                     if (activeScope.get(key).isnil()) {
-                        activeScope.set(key, LuaValue.valueOf(true))
+                        activeScope.set(key, valueOf(true))
                         effectFunc.checkfunction().call()
                     }
                 }
@@ -246,7 +263,8 @@ class LuaComposeLib : TwoArgFunction() {
             plugin.injectGlobals(targetTable)
 
             plugin.getComponents().forEach { (componentName, _) ->
-                val fullTypeName = if (plugin.namespace != null) "${plugin.namespace}.$componentName" else componentName
+                val fullTypeName =
+                    if (plugin.namespace != null) "${plugin.namespace}.$componentName" else componentName
                 val func = object : OneArgFunction() {
                     override fun call(arg: LuaValue): LuaValue {
                         val props = mutableMapOf<String, Any?>()
@@ -288,11 +306,16 @@ class LuaComposeLib : TwoArgFunction() {
                 val delay = table.get("delay").optint(0)
                 tween(durationMillis = duration, delayMillis = delay)
             }
+
             "spring" -> {
-                val dampingRatio = table.get("dampingRatio").optdouble(Spring.DampingRatioNoBouncy.toDouble()).toFloat()
-                val stiffness = table.get("stiffness").optdouble(Spring.StiffnessMedium.toDouble()).toFloat()
+                val dampingRatio =
+                    table.get("dampingRatio").optdouble(Spring.DampingRatioNoBouncy.toDouble())
+                        .toFloat()
+                val stiffness =
+                    table.get("stiffness").optdouble(Spring.StiffnessMedium.toDouble()).toFloat()
                 spring(dampingRatio = dampingRatio, stiffness = stiffness)
             }
+
             else -> spring()
         }
     }

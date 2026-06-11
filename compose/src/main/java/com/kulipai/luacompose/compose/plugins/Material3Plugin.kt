@@ -6,8 +6,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -32,7 +48,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
-import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,13 +68,13 @@ import org.luaj.LuaFunction
 import org.luaj.LuaTable
 import org.luaj.LuaValue
 import org.luaj.lib.OneArgFunction
-import kotlin.collections.get
 
 class Material3Plugin : LuaComposePlugin {
     override val namespace: String? = "material3"
 
     override fun getComponents(): Map<String, @Composable (props: Map<String, Any?>, childScope: LuaScope?) -> Unit> {
-        val map = mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: LuaScope?) -> Unit>()
+        val map =
+            mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: LuaScope?) -> Unit>()
 
         map["Text"] = { props, _ ->
             val textVal = when (val textProp = props["text"]) {
@@ -67,7 +82,7 @@ class Material3Plugin : LuaComposePlugin {
                 else -> textProp?.toString() ?: ""
             }
             val spVal = resolveSp(props["fontSize"])
-            
+
             val styleProp = props["style"]
             val style = if (styleProp is TextStyle) {
                 styleProp
@@ -91,7 +106,7 @@ class Material3Plugin : LuaComposePlugin {
                     else -> TextStyle.Default
                 }
             }
-            
+
             val fontWeightProp = props["fontWeight"]?.toString()?.lowercase()
             val fontWeight = when (fontWeightProp) {
                 "bold" -> FontWeight.Bold
@@ -99,7 +114,7 @@ class Material3Plugin : LuaComposePlugin {
                 "light" -> FontWeight.Light
                 else -> null
             }
-            
+
             Text(
                 text = textVal,
                 modifier = resolveModifier(props["modifier"]),
@@ -127,7 +142,7 @@ class Material3Plugin : LuaComposePlugin {
                     CardDefaults.cardColors(containerColor = containerColor)
                 } else CardDefaults.cardColors()
             }
-            
+
             val shape = props["shape"] as? Shape
                 ?: run {
                     val shapeProp = props["shape"]?.toString() ?: "rounded"
@@ -138,7 +153,7 @@ class Material3Plugin : LuaComposePlugin {
                         else -> androidx.compose.foundation.shape.RoundedCornerShape(radius.dp)
                     }
                 }
-            
+
             val elevationVal = (props["elevation"] as? Number)?.toFloat()
             val elevation = if (elevationVal != null) {
                 CardDefaults.cardElevation(defaultElevation = elevationVal.dp)
@@ -362,68 +377,118 @@ class Material3Plugin : LuaComposePlugin {
         luaTable.set("CardDefaults", cardDefaultsTable)
 
         val mtTable = LuaTable()
-        val typographyTable = LuaTable()
-        val defaultTypography = Typography()
-        typographyTable.set("displayLarge", LuaBridge.javaToLuaValue(defaultTypography.displayLarge))
-        typographyTable.set("displayMedium", LuaBridge.javaToLuaValue(defaultTypography.displayMedium))
-        typographyTable.set("displaySmall", LuaBridge.javaToLuaValue(defaultTypography.displaySmall))
-        typographyTable.set("headlineLarge", LuaBridge.javaToLuaValue(defaultTypography.headlineLarge))
-        typographyTable.set("headlineMedium", LuaBridge.javaToLuaValue(defaultTypography.headlineMedium))
-        typographyTable.set("headlineSmall", LuaBridge.javaToLuaValue(defaultTypography.headlineSmall))
-        typographyTable.set("titleLarge", LuaBridge.javaToLuaValue(defaultTypography.titleLarge))
-        typographyTable.set("titleMedium", LuaBridge.javaToLuaValue(defaultTypography.titleMedium))
-        typographyTable.set("titleSmall", LuaBridge.javaToLuaValue(defaultTypography.titleSmall))
-        typographyTable.set("bodyLarge", LuaBridge.javaToLuaValue(defaultTypography.bodyLarge))
-        typographyTable.set("bodyMedium", LuaBridge.javaToLuaValue(defaultTypography.bodyMedium))
-        typographyTable.set("bodySmall", LuaBridge.javaToLuaValue(defaultTypography.bodySmall))
-        typographyTable.set("labelLarge", LuaBridge.javaToLuaValue(defaultTypography.labelLarge))
-        typographyTable.set("labelMedium", LuaBridge.javaToLuaValue(defaultTypography.labelMedium))
-        typographyTable.set("labelSmall", LuaBridge.javaToLuaValue(defaultTypography.labelSmall))
-                val defaultColors = androidx.compose.material3.lightColorScheme()
-        val colorSchemeTable = LuaTable()
-        colorSchemeTable.set("primary", LuaBridge.javaToLuaValue(defaultColors.primary))
-        colorSchemeTable.set("onPrimary", LuaBridge.javaToLuaValue(defaultColors.onPrimary))
-        colorSchemeTable.set("primaryContainer", LuaBridge.javaToLuaValue(defaultColors.primaryContainer))
-        colorSchemeTable.set("onPrimaryContainer", LuaBridge.javaToLuaValue(defaultColors.onPrimaryContainer))
-        colorSchemeTable.set("secondary", LuaBridge.javaToLuaValue(defaultColors.secondary))
-        colorSchemeTable.set("onSecondary", LuaBridge.javaToLuaValue(defaultColors.onSecondary))
-        colorSchemeTable.set("secondaryContainer", LuaBridge.javaToLuaValue(defaultColors.secondaryContainer))
-        colorSchemeTable.set("onSecondaryContainer", LuaBridge.javaToLuaValue(defaultColors.onSecondaryContainer))
-        colorSchemeTable.set("tertiary", LuaBridge.javaToLuaValue(defaultColors.tertiary))
-        colorSchemeTable.set("onTertiary", LuaBridge.javaToLuaValue(defaultColors.onTertiary))
-        colorSchemeTable.set("tertiaryContainer", LuaBridge.javaToLuaValue(defaultColors.tertiaryContainer))
-        colorSchemeTable.set("onTertiaryContainer", LuaBridge.javaToLuaValue(defaultColors.onTertiaryContainer))
-        colorSchemeTable.set("error", LuaBridge.javaToLuaValue(defaultColors.error))
-        colorSchemeTable.set("errorContainer", LuaBridge.javaToLuaValue(defaultColors.errorContainer))
-        colorSchemeTable.set("onError", LuaBridge.javaToLuaValue(defaultColors.onError))
-        colorSchemeTable.set("onErrorContainer", LuaBridge.javaToLuaValue(defaultColors.onErrorContainer))
-        colorSchemeTable.set("background", LuaBridge.javaToLuaValue(defaultColors.background))
-        colorSchemeTable.set("onBackground", LuaBridge.javaToLuaValue(defaultColors.onBackground))
-        colorSchemeTable.set("surface", LuaBridge.javaToLuaValue(defaultColors.surface))
-        colorSchemeTable.set("onSurface", LuaBridge.javaToLuaValue(defaultColors.onSurface))
-        colorSchemeTable.set("surfaceVariant", LuaBridge.javaToLuaValue(defaultColors.surfaceVariant))
-        colorSchemeTable.set("onSurfaceVariant", LuaBridge.javaToLuaValue(defaultColors.onSurfaceVariant))
-        colorSchemeTable.set("outline", LuaBridge.javaToLuaValue(defaultColors.outline))
-        colorSchemeTable.set("inverseOnSurface", LuaBridge.javaToLuaValue(defaultColors.inverseOnSurface))
-        colorSchemeTable.set("inverseSurface", LuaBridge.javaToLuaValue(defaultColors.inverseSurface))
-        colorSchemeTable.set("inversePrimary", LuaBridge.javaToLuaValue(defaultColors.inversePrimary))
-        colorSchemeTable.set("surfaceTint", LuaBridge.javaToLuaValue(defaultColors.surfaceTint))
-        colorSchemeTable.set("outlineVariant", LuaBridge.javaToLuaValue(defaultColors.outlineVariant))
-        colorSchemeTable.set("scrim", LuaBridge.javaToLuaValue(defaultColors.scrim))
-        mtTable.set("colorScheme", colorSchemeTable)
-        mtTable.set("colors", colorSchemeTable) // Alias for convenience
 
-        val defaultShapes = androidx.compose.material3.Shapes()
-        val shapesTable = LuaTable()
-        shapesTable.set("extraSmall", LuaBridge.javaToLuaValue(defaultShapes.extraSmall))
-        shapesTable.set("small", LuaBridge.javaToLuaValue(defaultShapes.small))
-        shapesTable.set("medium", LuaBridge.javaToLuaValue(defaultShapes.medium))
-        shapesTable.set("large", LuaBridge.javaToLuaValue(defaultShapes.large))
-        shapesTable.set("extraLarge", LuaBridge.javaToLuaValue(defaultShapes.extraLarge))
-        mtTable.set("shapes", shapesTable)
-        mtTable.set("shape", shapesTable) // Alias for convenience
-        
+        // --- ColorScheme ---
+        val colorSchemeTable = LuaTable()
+        val colorSchemeMeta = LuaTable()
+        colorSchemeMeta.set("__index", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(table: LuaValue, key: LuaValue): LuaValue {
+                val scope = LuaBridge.getActiveScope()
+                val cs = scope?.colorScheme ?: androidx.compose.material3.lightColorScheme()
+                return when (key.checkjstring()) {
+                    "primary" -> LuaBridge.javaToLuaValue(cs.primary)
+                    "onPrimary" -> LuaBridge.javaToLuaValue(cs.onPrimary)
+                    "primaryContainer" -> LuaBridge.javaToLuaValue(cs.primaryContainer)
+                    "onPrimaryContainer" -> LuaBridge.javaToLuaValue(
+                        cs.onPrimaryContainer
+                    )
+
+                    "secondary" -> LuaBridge.javaToLuaValue(cs.secondary)
+                    "onSecondary" -> LuaBridge.javaToLuaValue(cs.onSecondary)
+                    "secondaryContainer" -> LuaBridge.javaToLuaValue(
+                        cs.secondaryContainer
+                    )
+
+                    "onSecondaryContainer" -> LuaBridge.javaToLuaValue(
+                        cs.onSecondaryContainer
+                    )
+
+                    "tertiary" -> LuaBridge.javaToLuaValue(cs.tertiary)
+                    "onTertiary" -> LuaBridge.javaToLuaValue(cs.onTertiary)
+                    "tertiaryContainer" -> LuaBridge.javaToLuaValue(
+                        cs.tertiaryContainer
+                    )
+
+                    "onTertiaryContainer" -> LuaBridge.javaToLuaValue(
+                        cs.onTertiaryContainer
+                    )
+
+                    "error" -> LuaBridge.javaToLuaValue(cs.error)
+                    "errorContainer" -> LuaBridge.javaToLuaValue(cs.errorContainer)
+                    "onError" -> LuaBridge.javaToLuaValue(cs.onError)
+                    "onErrorContainer" -> LuaBridge.javaToLuaValue(cs.onErrorContainer)
+                    "background" -> LuaBridge.javaToLuaValue(cs.background)
+                    "onBackground" -> LuaBridge.javaToLuaValue(cs.onBackground)
+                    "surface" -> LuaBridge.javaToLuaValue(cs.surface)
+                    "onSurface" -> LuaBridge.javaToLuaValue(cs.onSurface)
+                    "surfaceVariant" -> LuaBridge.javaToLuaValue(cs.surfaceVariant)
+                    "onSurfaceVariant" -> LuaBridge.javaToLuaValue(cs.onSurfaceVariant)
+                    "outline" -> LuaBridge.javaToLuaValue(cs.outline)
+                    "inverseOnSurface" -> LuaBridge.javaToLuaValue(cs.inverseOnSurface)
+                    "inverseSurface" -> LuaBridge.javaToLuaValue(cs.inverseSurface)
+                    "inversePrimary" -> LuaBridge.javaToLuaValue(cs.inversePrimary)
+                    "surfaceTint" -> LuaBridge.javaToLuaValue(cs.surfaceTint)
+                    "outlineVariant" -> LuaBridge.javaToLuaValue(cs.outlineVariant)
+                    "scrim" -> LuaBridge.javaToLuaValue(cs.scrim)
+                    else -> org.luaj.LuaValue.NIL
+                }
+            }
+        })
+        colorSchemeTable.setmetatable(colorSchemeMeta)
+        mtTable.set("colorScheme", colorSchemeTable)
+        mtTable.set("colors", colorSchemeTable) // Alias
+
+        // --- Typography ---
+        val typographyTable = LuaTable()
+        val typographyMeta = LuaTable()
+        typographyMeta.set("__index", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(table: org.luaj.LuaValue, key: org.luaj.LuaValue): org.luaj.LuaValue {
+                val scope = LuaBridge.getActiveScope()
+                val typo = scope?.typography ?: androidx.compose.material3.Typography()
+                return when (key.checkjstring()) {
+                    "displayLarge" -> LuaBridge.javaToLuaValue(typo.displayLarge)
+                    "displayMedium" -> LuaBridge.javaToLuaValue(typo.displayMedium)
+                    "displaySmall" -> LuaBridge.javaToLuaValue(typo.displaySmall)
+                    "headlineLarge" -> LuaBridge.javaToLuaValue(typo.headlineLarge)
+                    "headlineMedium" -> LuaBridge.javaToLuaValue(typo.headlineMedium)
+                    "headlineSmall" -> LuaBridge.javaToLuaValue(typo.headlineSmall)
+                    "titleLarge" -> LuaBridge.javaToLuaValue(typo.titleLarge)
+                    "titleMedium" -> LuaBridge.javaToLuaValue(typo.titleMedium)
+                    "titleSmall" -> LuaBridge.javaToLuaValue(typo.titleSmall)
+                    "bodyLarge" -> LuaBridge.javaToLuaValue(typo.bodyLarge)
+                    "bodyMedium" -> LuaBridge.javaToLuaValue(typo.bodyMedium)
+                    "bodySmall" -> LuaBridge.javaToLuaValue(typo.bodySmall)
+                    "labelLarge" -> LuaBridge.javaToLuaValue(typo.labelLarge)
+                    "labelMedium" -> LuaBridge.javaToLuaValue(typo.labelMedium)
+                    "labelSmall" -> LuaBridge.javaToLuaValue(typo.labelSmall)
+                    else -> org.luaj.LuaValue.NIL
+                }
+            }
+        })
+        typographyTable.setmetatable(typographyMeta)
         mtTable.set("typography", typographyTable)
+
+        // --- Shapes ---
+        val shapesTable = LuaTable()
+        val shapesMeta = LuaTable()
+        shapesMeta.set("__index", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(table: org.luaj.LuaValue, key: org.luaj.LuaValue): org.luaj.LuaValue {
+                val scope = LuaBridge.getActiveScope()
+                val sh = scope?.shapes ?: androidx.compose.material3.Shapes()
+                return when (key.checkjstring()) {
+                    "extraSmall" -> LuaBridge.javaToLuaValue(sh.extraSmall)
+                    "small" -> LuaBridge.javaToLuaValue(sh.small)
+                    "medium" -> LuaBridge.javaToLuaValue(sh.medium)
+                    "large" -> LuaBridge.javaToLuaValue(sh.large)
+                    "extraLarge" -> LuaBridge.javaToLuaValue(sh.extraLarge)
+                    else -> org.luaj.LuaValue.NIL
+                }
+            }
+        })
+        shapesTable.setmetatable(shapesMeta)
+        mtTable.set("shapes", shapesTable)
+        mtTable.set("shape", shapesTable) // Alias
+
         luaTable.set("MaterialTheme", mtTable)
     }
 

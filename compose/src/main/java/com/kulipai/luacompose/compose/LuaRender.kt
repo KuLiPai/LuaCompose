@@ -23,8 +23,22 @@ fun LuaScopeComponent(scope: LuaScope, parentComposeScope: Any? = null, vararg a
     scope.density = LocalDensity.current
     scope.configuration = LocalConfiguration.current
 
+    val currentColorScheme = androidx.compose.material3.MaterialTheme.colorScheme
+    val currentTypography = androidx.compose.material3.MaterialTheme.typography
+    val currentShapes = androidx.compose.material3.MaterialTheme.shapes
+
+    scope.colorScheme = currentColorScheme
+    scope.typography = currentTypography
+    scope.shapes = currentShapes
+
     val version by scope.recomposeVersion
-    val nodes = remember(version, *args) { scope.execute(*args) }
+    val nodes = remember(
+        version,
+        currentColorScheme,
+        currentTypography,
+        currentShapes,
+        *args
+    ) { scope.execute(*args) }
 
     for (node in nodes) {
         LuaNodeRenderer(node, parentComposeScope)
@@ -43,14 +57,17 @@ fun LuaNodeRenderer(node: LuaNode, parentComposeScope: Any? = null) {
                 val alignment = LuaComposeRegistry.resolveBoxAlignment(alignmentStr)
                 with(parentComposeScope) { childModifier.align(alignment) }
             }
+
             is androidx.compose.foundation.layout.ColumnScope -> {
                 val alignment = LuaComposeRegistry.resolveColumnAlignment(alignmentStr)
                 with(parentComposeScope) { childModifier.align(alignment) }
             }
+
             is androidx.compose.foundation.layout.RowScope -> {
                 val alignment = LuaComposeRegistry.resolveRowAlignment(alignmentStr)
                 with(parentComposeScope) { childModifier.align(alignment) }
             }
+
             else -> childModifier
         }
     } else {
@@ -59,8 +76,18 @@ fun LuaNodeRenderer(node: LuaNode, parentComposeScope: Any? = null) {
 
     if (weightVal != null && parentComposeScope != null) {
         finalModifier = when (parentComposeScope) {
-            is androidx.compose.foundation.layout.ColumnScope -> with(parentComposeScope) { finalModifier.weight(weightVal) }
-            is androidx.compose.foundation.layout.RowScope -> with(parentComposeScope) { finalModifier.weight(weightVal) }
+            is androidx.compose.foundation.layout.ColumnScope -> with(parentComposeScope) {
+                finalModifier.weight(
+                    weightVal
+                )
+            }
+
+            is androidx.compose.foundation.layout.RowScope -> with(parentComposeScope) {
+                finalModifier.weight(
+                    weightVal
+                )
+            }
+
             else -> finalModifier
         }
     }

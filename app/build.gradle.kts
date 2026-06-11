@@ -16,16 +16,14 @@ android {
         versionCode = 1
         versionName = "1.0.0-experimental"
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+//        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            optimization {
+                enable = true
+            }
         }
     }
     compileOptions {
@@ -48,10 +46,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
-    androidTestImplementation(platform(libs.androidx.compose.bom))
 
-    debugImplementation(libs.androidx.compose.ui.test.manifest)
-    debugImplementation(libs.androidx.compose.ui.tooling)
 
 
     implementation(project(":androlua"))

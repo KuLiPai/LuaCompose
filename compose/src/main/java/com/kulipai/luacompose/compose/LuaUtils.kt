@@ -1,0 +1,52 @@
+package com.kulipai.luacompose.compose
+
+import android.annotation.SuppressLint
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.graphics.toColorInt
+
+@SuppressLint("ModifierFactoryExtensionFunction")
+fun resolveModifier(prop: Any?): Modifier {
+    return when (prop) {
+        is LuaModifier -> prop.modifier
+        is Modifier -> prop
+        else -> Modifier
+    }
+}
+
+fun resolveColor(colorProp: Any?, defaultColor: Color = Color.Unspecified): Color {
+    return when (colorProp) {
+        null -> defaultColor
+        is Color -> colorProp
+        is Long -> {
+            if (colorProp in 0L..4294967295L) { Color(colorProp) } else { Color(colorProp.toULong()) }
+        }
+        else -> {
+            val colorStr = colorProp.toString()
+            try {
+                val longVal = colorStr.toLongOrNull()
+                if (longVal != null) { resolveColor(longVal, defaultColor) } else { Color(colorStr.toColorInt()) }
+            } catch (_: Exception) { defaultColor }
+        }
+    }
+}
+
+fun resolveDp(value: Any?): androidx.compose.ui.unit.Dp {
+    return when (value) {
+        is androidx.compose.ui.unit.Dp -> value
+        is Number -> value.toFloat().dp
+        is String -> value.toFloatOrNull()?.dp ?: 0.dp
+        else -> 0.dp
+    }
+}
+
+fun resolveSp(value: Any?): androidx.compose.ui.unit.TextUnit {
+    return when (value) {
+        is androidx.compose.ui.unit.TextUnit -> value
+        is Number -> value.toFloat().sp
+        is String -> value.toFloatOrNull()?.sp ?: androidx.compose.ui.unit.TextUnit.Unspecified
+        else -> androidx.compose.ui.unit.TextUnit.Unspecified
+    }
+}

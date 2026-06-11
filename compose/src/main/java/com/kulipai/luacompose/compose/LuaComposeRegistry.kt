@@ -27,6 +27,8 @@ import org.luaj.lib.jse.CoerceJavaToLua
 
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Path
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.Color
 
 class LuaPath(val path: Path = Path()) : LuaTable() {
     init {
@@ -190,6 +192,64 @@ class LuaDrawScope(val drawScope: DrawScope) : LuaTable() {
 
 object LuaComposeRegistry {
     val components = mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: LuaScope?) -> Unit>()
+    val m3ComponentNames = mutableSetOf<String>()
+
+    fun resolveVerticalArrangement(prop: Any?): Arrangement.Vertical {
+        return when (prop?.toString()?.lowercase()) {
+            "top" -> Arrangement.Top
+            "bottom" -> Arrangement.Bottom
+            "center" -> Arrangement.Center
+            "spacebetween" -> Arrangement.SpaceBetween
+            "spacearound" -> Arrangement.SpaceAround
+            "spaceevenly" -> Arrangement.SpaceEvenly
+            else -> Arrangement.Top
+        }
+    }
+
+    fun resolveHorizontalArrangement(prop: Any?): Arrangement.Horizontal {
+        return when (prop?.toString()?.lowercase()) {
+            "start" -> Arrangement.Start
+            "end" -> Arrangement.End
+            "center" -> Arrangement.Center
+            "spacebetween" -> Arrangement.SpaceBetween
+            "spacearound" -> Arrangement.SpaceAround
+            "spaceevenly" -> Arrangement.SpaceEvenly
+            else -> Arrangement.Start
+        }
+    }
+
+    fun resolveHorizontalAlignment(prop: Any?): Alignment.Horizontal {
+        return when (prop?.toString()?.lowercase()) {
+            "start" -> Alignment.Start
+            "end" -> Alignment.End
+            "center" -> Alignment.CenterHorizontally
+            else -> Alignment.Start
+        }
+    }
+
+    fun resolveVerticalAlignment(prop: Any?): Alignment.Vertical {
+        return when (prop?.toString()?.lowercase()) {
+            "top" -> Alignment.Top
+            "bottom" -> Alignment.Bottom
+            "center" -> Alignment.CenterVertically
+            else -> Alignment.Top
+        }
+    }
+
+    fun resolveAlignment(prop: Any?): Alignment {
+        return when (prop?.toString()?.lowercase()) {
+            "topstart" -> Alignment.TopStart
+            "topcenter" -> Alignment.TopCenter
+            "topend" -> Alignment.TopEnd
+            "centerstart" -> Alignment.CenterStart
+            "center" -> Alignment.Center
+            "centerend" -> Alignment.CenterEnd
+            "bottomstart" -> Alignment.BottomStart
+            "bottomcenter" -> Alignment.BottomCenter
+            "bottomend" -> Alignment.BottomEnd
+            else -> Alignment.TopStart
+        }
+    }
 
     init {
         // --- 0. 生命周期与副作用 ---
@@ -237,27 +297,13 @@ object LuaComposeRegistry {
         }
 
         // --- 1. 基础排版组件 ---
-        
-        register("Text") { props, _ ->
-            val textVal = when (val textProp = props["text"]) {
-                is LuaState -> textProp.get()?.toString() ?: ""
-                else -> textProp?.toString() ?: ""
-            }
-            val spVal = resolveSp(props["fontSize"])
-            Text(
-                text = textVal,
-                modifier = resolveModifier(props["modifier"]),
-                color = resolveColor(props["color"]),
-                fontSize = if (spVal != androidx.compose.ui.unit.TextUnit.Unspecified) spVal else androidx.compose.ui.unit.TextUnit.Unspecified
-            )
-        }
 
         register("Column") { props, childScope ->
             val modifier = resolveModifier(props["modifier"])
             Column(
                 modifier = modifier,
-                verticalArrangement = Arrangement.Top,
-                horizontalAlignment = Alignment.Start
+                verticalArrangement = resolveVerticalArrangement(props["verticalArrangement"]),
+                horizontalAlignment = resolveHorizontalAlignment(props["horizontalAlignment"])
             ) {
                 childScope?.let { LuaScopeComponent(it, this) }
             }
@@ -267,8 +313,8 @@ object LuaComposeRegistry {
             val modifier = resolveModifier(props["modifier"])
             Row(
                 modifier = modifier,
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.Top
+                horizontalArrangement = resolveHorizontalArrangement(props["horizontalArrangement"]),
+                verticalAlignment = resolveVerticalAlignment(props["verticalAlignment"])
             ) {
                 childScope?.let { LuaScopeComponent(it, this) }
             }
@@ -278,7 +324,7 @@ object LuaComposeRegistry {
             val modifier = resolveModifier(props["modifier"])
             Box(
                 modifier = modifier,
-                contentAlignment = Alignment.TopStart
+                contentAlignment = resolveAlignment(props["contentAlignment"])
             ) {
                 childScope?.let { LuaScopeComponent(it, this) }
             }
@@ -297,6 +343,112 @@ object LuaComposeRegistry {
                         e.printStackTrace()
                     }
                 }
+            }
+        }
+
+        // --- Material 3 组件 ---
+        m3ComponentNames.add("Text")
+        register("Text") { props, _ ->
+            val textVal = when (val textProp = props["text"]) {
+                is LuaState -> textProp.get()?.toString() ?: ""
+                else -> textProp?.toString() ?: ""
+            }
+            val spVal = resolveSp(props["fontSize"])
+            
+            // Map common string values to MaterialTheme typography
+            val styleProp = props["style"]
+            val style = if (styleProp is androidx.compose.ui.text.TextStyle) {
+                styleProp
+            } else {
+                when (styleProp?.toString()?.lowercase()) {
+                    "displaylarge" -> androidx.compose.material3.MaterialTheme.typography.displayLarge
+                    "displaymedium" -> androidx.compose.material3.MaterialTheme.typography.displayMedium
+                    "displaysmall" -> androidx.compose.material3.MaterialTheme.typography.displaySmall
+                    "headlinelarge" -> androidx.compose.material3.MaterialTheme.typography.headlineLarge
+                    "headlinemedium" -> androidx.compose.material3.MaterialTheme.typography.headlineMedium
+                    "headlinesmall" -> androidx.compose.material3.MaterialTheme.typography.headlineSmall
+                    "titlelarge" -> androidx.compose.material3.MaterialTheme.typography.titleLarge
+                    "titlemedium" -> androidx.compose.material3.MaterialTheme.typography.titleMedium
+                    "titlesmall" -> androidx.compose.material3.MaterialTheme.typography.titleSmall
+                    "bodylarge" -> androidx.compose.material3.MaterialTheme.typography.bodyLarge
+                    "bodymedium" -> androidx.compose.material3.MaterialTheme.typography.bodyMedium
+                    "bodysmall" -> androidx.compose.material3.MaterialTheme.typography.bodySmall
+                    "labellarge" -> androidx.compose.material3.MaterialTheme.typography.labelLarge
+                    "labelmedium" -> androidx.compose.material3.MaterialTheme.typography.labelMedium
+                    "labelsmall" -> androidx.compose.material3.MaterialTheme.typography.labelSmall
+                    else -> androidx.compose.ui.text.TextStyle.Default
+                }
+            }
+            
+            val fontWeightProp = props["fontWeight"]?.toString()?.lowercase()
+            val fontWeight = when (fontWeightProp) {
+                "bold" -> androidx.compose.ui.text.font.FontWeight.Bold
+                "medium" -> androidx.compose.ui.text.font.FontWeight.Medium
+                "light" -> androidx.compose.ui.text.font.FontWeight.Light
+                else -> null
+            }
+            
+            Text(
+                text = textVal,
+                modifier = resolveModifier(props["modifier"]),
+                color = resolveColor(props["color"]),
+                fontSize = if (spVal != androidx.compose.ui.unit.TextUnit.Unspecified) spVal else androidx.compose.ui.unit.TextUnit.Unspecified,
+                style = style,
+                fontWeight = fontWeight
+            )
+        }
+
+        m3ComponentNames.add("MaterialTheme")
+        register("MaterialTheme") { props, childScope ->
+            // MaterialTheme context
+            androidx.compose.material3.MaterialTheme {
+                childScope?.let { LuaScopeComponent(it, this) }
+            }
+        }
+
+        m3ComponentNames.add("Card")
+        register("Card") { props, childScope ->
+            val modifier = resolveModifier(props["modifier"])
+            // colors
+            val colorsProp = props["colors"]
+            val colors = if (colorsProp is Map<*, *> && colorsProp["_isCardColors"] == true) {
+                val containerColor = resolveColor(colorsProp["containerColor"], Color.Unspecified)
+                val contentColor = resolveColor(colorsProp["contentColor"], Color.Unspecified)
+                androidx.compose.material3.CardDefaults.cardColors(
+                    containerColor = containerColor,
+                    contentColor = contentColor
+                )
+            } else {
+                val containerColor = resolveColor(props["containerColor"], Color.Unspecified)
+                if (containerColor != Color.Unspecified) {
+                    androidx.compose.material3.CardDefaults.cardColors(containerColor = containerColor)
+                } else androidx.compose.material3.CardDefaults.cardColors()
+            }
+            
+            // shape
+            val shape = props["shape"] as? androidx.compose.ui.graphics.Shape
+                ?: run {
+                    val shapeProp = props["shape"]?.toString() ?: "rounded"
+                    val radius = (props["cornerRadius"] as? Number)?.toFloat() ?: 12f
+                    when (shapeProp.lowercase()) {
+                        "circle" -> androidx.compose.foundation.shape.CircleShape
+                        "rounded" -> androidx.compose.foundation.shape.RoundedCornerShape(radius.dp)
+                        else -> androidx.compose.foundation.shape.RoundedCornerShape(radius.dp)
+                    }
+                }
+            
+            val elevationVal = (props["elevation"] as? Number)?.toFloat()
+            val elevation = if (elevationVal != null) {
+                androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = elevationVal.dp)
+            } else androidx.compose.material3.CardDefaults.cardElevation()
+            
+            androidx.compose.material3.Card(
+                modifier = modifier,
+                shape = shape,
+                colors = colors,
+                elevation = elevation
+            ) {
+                childScope?.let { LuaScopeComponent(it, this) }
             }
         }
 

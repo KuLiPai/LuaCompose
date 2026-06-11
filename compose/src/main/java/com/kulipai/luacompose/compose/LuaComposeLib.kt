@@ -23,23 +23,7 @@ class LuaComposeLib : LuaTable() {
             }
         })
 
-        // Register LaunchedEffect
-        set("LaunchedEffect", object : TwoArgFunction() {
-            override fun call(key: LuaValue, contentFunc: LuaValue): LuaValue {
-                val node = LuaNode("LaunchedEffect", mapOf("key" to key, "content" to contentFunc))
-                LuaBridge.getActiveNodeList()?.add(node)
-                return NIL
-            }
-        })
 
-        // Register DisposableEffect
-        set("DisposableEffect", object : TwoArgFunction() {
-            override fun call(key: LuaValue, contentFunc: LuaValue): LuaValue {
-                val node = LuaNode("DisposableEffect", mapOf("key" to key, "content" to contentFunc))
-                LuaBridge.getActiveNodeList()?.add(node)
-                return NIL
-            }
-        })
 
         // Register global state
         set("state", object : OneArgFunction() {
@@ -210,19 +194,71 @@ class LuaComposeLib : LuaTable() {
         })
 
         // Register components from Registry
+        val m3Table = LuaTable()
+        set("material3", m3Table)
+        
+        // Add shape helpers
+        set("RoundedCornerShape", object : OneArgFunction() {
+            override fun call(arg: LuaValue): LuaValue {
+                val radius = resolveDp(LuaBridge.luaValueToJava(arg))
+                return LuaBridge.javaToLuaValue(androidx.compose.foundation.shape.RoundedCornerShape(radius))
+            }
+        })
+        set("CircleShape", LuaBridge.javaToLuaValue(androidx.compose.foundation.shape.CircleShape))
+
+        // Add CardDefaults
+        val cardDefaultsTable = LuaTable()
+        cardDefaultsTable.set("cardColors", object : OneArgFunction() {
+            override fun call(arg: LuaValue): LuaValue {
+                val table = LuaTable()
+                table.set("_isCardColors", LuaValue.valueOf(true))
+                if (arg.istable()) {
+                    val luaMap = arg.checktable()
+                    val containerColor = luaMap.get("containerColor")
+                    val contentColor = luaMap.get("contentColor")
+                    if (!containerColor.isnil()) table.set("containerColor", containerColor)
+                    if (!contentColor.isnil()) table.set("contentColor", contentColor)
+                }
+                return table
+            }
+        })
+        m3Table.set("CardDefaults", cardDefaultsTable)
+
+        // Add MaterialTheme.typography
+        val mtTable = LuaTable()
+        val typographyTable = LuaTable()
+        val defaultTypography = androidx.compose.material3.Typography()
+        typographyTable.set("displayLarge", LuaBridge.javaToLuaValue(defaultTypography.displayLarge))
+        typographyTable.set("displayMedium", LuaBridge.javaToLuaValue(defaultTypography.displayMedium))
+        typographyTable.set("displaySmall", LuaBridge.javaToLuaValue(defaultTypography.displaySmall))
+        typographyTable.set("headlineLarge", LuaBridge.javaToLuaValue(defaultTypography.headlineLarge))
+        typographyTable.set("headlineMedium", LuaBridge.javaToLuaValue(defaultTypography.headlineMedium))
+        typographyTable.set("headlineSmall", LuaBridge.javaToLuaValue(defaultTypography.headlineSmall))
+        typographyTable.set("titleLarge", LuaBridge.javaToLuaValue(defaultTypography.titleLarge))
+        typographyTable.set("titleMedium", LuaBridge.javaToLuaValue(defaultTypography.titleMedium))
+        typographyTable.set("titleSmall", LuaBridge.javaToLuaValue(defaultTypography.titleSmall))
+        typographyTable.set("bodyLarge", LuaBridge.javaToLuaValue(defaultTypography.bodyLarge))
+        typographyTable.set("bodyMedium", LuaBridge.javaToLuaValue(defaultTypography.bodyMedium))
+        typographyTable.set("bodySmall", LuaBridge.javaToLuaValue(defaultTypography.bodySmall))
+        typographyTable.set("labelLarge", LuaBridge.javaToLuaValue(defaultTypography.labelLarge))
+        typographyTable.set("labelMedium", LuaBridge.javaToLuaValue(defaultTypography.labelMedium))
+        typographyTable.set("labelSmall", LuaBridge.javaToLuaValue(defaultTypography.labelSmall))
+        mtTable.set("typography", typographyTable)
+        m3Table.set("MaterialTheme", mtTable)
+        
         LuaComposeRegistry.components.keys.forEach { componentName ->
-            set(componentName, object : OneArgFunction() {
-                override fun call(propsVal: LuaValue): LuaValue {
+            val func = object : OneArgFunction() {
+                override fun call(arg: LuaValue): LuaValue {
                     var props = mutableMapOf<String, Any?>()
                     var contentFunc: LuaFunction? = null
 
-                    if (propsVal.isstring()) {
-                        props["text"] = propsVal.tojstring()
-                    } else if (propsVal.isfunction()) {
-                        contentFunc = propsVal.checkfunction()
-                    } else if (propsVal.istable()) {
-                        props = LuaBridge.luaTableToMap(propsVal).toMutableMap()
-                        val contentVal = propsVal.get("content")
+                    if (arg.isstring()) {
+                        props["text"] = arg.tojstring()
+                    } else if (arg.isfunction()) {
+                        contentFunc = arg.checkfunction()
+                    } else if (arg.istable()) {
+                        props = LuaBridge.luaTableToMap(arg).toMutableMap()
+                        val contentVal = arg.get("content")
                         if (contentVal.isfunction()) {
                             contentFunc = contentVal.checkfunction()
                         }
@@ -244,7 +280,12 @@ class LuaComposeLib : LuaTable() {
                     
                     return NIL
                 }
-            })
+            }
+            if (LuaComposeRegistry.m3ComponentNames.contains(componentName)) {
+                m3Table.set(componentName, func)
+            } else {
+                set(componentName, func)
+            }
         }
     }
 }

@@ -233,10 +233,11 @@ class LuaScope(var contentFunc: LuaFunction) : org.luaj.LuaTable() {
             contentFunc.invoke(LuaValue.varargsOf(args))
         } catch (e: Exception) {
             e.printStackTrace()
+            val errorMsg = "Lua Error: ${e.message}\n\n${android.util.Log.getStackTraceString(e)}"
             rootNodes.add(
                 LuaNode(
-                    "Text",
-                    mapOf("text" to "Lua Error: ${e.message}", "color" to "#ff0000"),
+                    "LuaError",
+                    mapOf("text" to errorMsg, "color" to "#ff0000"),
                     null
                 )
             )

@@ -45,6 +45,28 @@ class LuaComposeLib : TwoArgFunction() {
             }
         })
 
+        composeTable.set("state", object : OneArgFunction() {
+            override fun call(initialValue: LuaValue): LuaValue {
+                val scope = LuaBridge.getActiveScope() ?: throw RuntimeException("compose.state() 必须在 Compose 上下文中调用")
+                return scope.get("state").call(scope, initialValue)
+            }
+        })
+
+        composeTable.set("remember", object : OneArgFunction() {
+            override fun call(initFunc: LuaValue): LuaValue {
+                val scope = LuaBridge.getActiveScope() ?: throw RuntimeException("compose.remember() 必须在 Compose 上下文中调用")
+                return scope.get("remember").call(scope, initFunc)
+            }
+        })
+
+        composeTable.set("derivedStateOf", object : OneArgFunction() {
+            override fun call(computeFunc: LuaValue): LuaValue {
+                val scope = LuaBridge.getActiveScope() ?: throw RuntimeException("compose.derivedStateOf() 必须在 Compose 上下文中调用")
+                return scope.get("derivedStateOf").call(scope, computeFunc)
+            }
+        })
+
+
         composeTable.set("Color", object : OneArgFunction() {
             override fun call(arg: LuaValue): LuaValue {
                 return LuaBridge.javaToLuaValue(resolveColor(LuaBridge.luaValueToJava(arg)))
@@ -54,6 +76,32 @@ class LuaComposeLib : TwoArgFunction() {
         composeTable.set("Path", object : ZeroArgFunction() {
             override fun call(): LuaValue {
                 return LuaPath()
+            }
+        })
+
+                composeTable.set("tween", object : org.luaj.lib.VarArgFunction() {
+            override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
+                val duration = args.optint(1, 300)
+                val delay = args.optint(2, 0)
+                val easingStr = args.optjstring(3, "FastOutSlowIn")
+                val table = LuaTable()
+                table.set("type", "tween")
+                table.set("duration", duration)
+                table.set("delay", delay)
+                table.set("easing", easingStr)
+                return table
+            }
+        })
+
+        composeTable.set("spring", object : org.luaj.lib.VarArgFunction() {
+            override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
+                val damping = args.optdouble(1, Spring.DampingRatioNoBouncy.toDouble()).toFloat()
+                val stiffness = args.optdouble(2, Spring.StiffnessMedium.toDouble()).toFloat()
+                val table = LuaTable()
+                table.set("type", "spring")
+                table.set("dampingRatio", damping.toDouble())
+                table.set("stiffness", stiffness.toDouble())
+                return table
             }
         })
 

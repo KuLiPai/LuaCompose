@@ -110,11 +110,6 @@ class Material3Plugin : LuaComposePlugin {
             )
         }
 
-        map["MaterialTheme"] = { props, childScope ->
-            MaterialTheme {
-                childScope?.let { LuaScopeComponent(it, this) }
-            }
-        }
 
         map["Card"] = { props, childScope ->
             val modifier = resolveModifier(props["modifier"])
@@ -384,6 +379,50 @@ class Material3Plugin : LuaComposePlugin {
         typographyTable.set("labelLarge", LuaBridge.javaToLuaValue(defaultTypography.labelLarge))
         typographyTable.set("labelMedium", LuaBridge.javaToLuaValue(defaultTypography.labelMedium))
         typographyTable.set("labelSmall", LuaBridge.javaToLuaValue(defaultTypography.labelSmall))
+                val defaultColors = androidx.compose.material3.lightColorScheme()
+        val colorSchemeTable = LuaTable()
+        colorSchemeTable.set("primary", LuaBridge.javaToLuaValue(defaultColors.primary))
+        colorSchemeTable.set("onPrimary", LuaBridge.javaToLuaValue(defaultColors.onPrimary))
+        colorSchemeTable.set("primaryContainer", LuaBridge.javaToLuaValue(defaultColors.primaryContainer))
+        colorSchemeTable.set("onPrimaryContainer", LuaBridge.javaToLuaValue(defaultColors.onPrimaryContainer))
+        colorSchemeTable.set("secondary", LuaBridge.javaToLuaValue(defaultColors.secondary))
+        colorSchemeTable.set("onSecondary", LuaBridge.javaToLuaValue(defaultColors.onSecondary))
+        colorSchemeTable.set("secondaryContainer", LuaBridge.javaToLuaValue(defaultColors.secondaryContainer))
+        colorSchemeTable.set("onSecondaryContainer", LuaBridge.javaToLuaValue(defaultColors.onSecondaryContainer))
+        colorSchemeTable.set("tertiary", LuaBridge.javaToLuaValue(defaultColors.tertiary))
+        colorSchemeTable.set("onTertiary", LuaBridge.javaToLuaValue(defaultColors.onTertiary))
+        colorSchemeTable.set("tertiaryContainer", LuaBridge.javaToLuaValue(defaultColors.tertiaryContainer))
+        colorSchemeTable.set("onTertiaryContainer", LuaBridge.javaToLuaValue(defaultColors.onTertiaryContainer))
+        colorSchemeTable.set("error", LuaBridge.javaToLuaValue(defaultColors.error))
+        colorSchemeTable.set("errorContainer", LuaBridge.javaToLuaValue(defaultColors.errorContainer))
+        colorSchemeTable.set("onError", LuaBridge.javaToLuaValue(defaultColors.onError))
+        colorSchemeTable.set("onErrorContainer", LuaBridge.javaToLuaValue(defaultColors.onErrorContainer))
+        colorSchemeTable.set("background", LuaBridge.javaToLuaValue(defaultColors.background))
+        colorSchemeTable.set("onBackground", LuaBridge.javaToLuaValue(defaultColors.onBackground))
+        colorSchemeTable.set("surface", LuaBridge.javaToLuaValue(defaultColors.surface))
+        colorSchemeTable.set("onSurface", LuaBridge.javaToLuaValue(defaultColors.onSurface))
+        colorSchemeTable.set("surfaceVariant", LuaBridge.javaToLuaValue(defaultColors.surfaceVariant))
+        colorSchemeTable.set("onSurfaceVariant", LuaBridge.javaToLuaValue(defaultColors.onSurfaceVariant))
+        colorSchemeTable.set("outline", LuaBridge.javaToLuaValue(defaultColors.outline))
+        colorSchemeTable.set("inverseOnSurface", LuaBridge.javaToLuaValue(defaultColors.inverseOnSurface))
+        colorSchemeTable.set("inverseSurface", LuaBridge.javaToLuaValue(defaultColors.inverseSurface))
+        colorSchemeTable.set("inversePrimary", LuaBridge.javaToLuaValue(defaultColors.inversePrimary))
+        colorSchemeTable.set("surfaceTint", LuaBridge.javaToLuaValue(defaultColors.surfaceTint))
+        colorSchemeTable.set("outlineVariant", LuaBridge.javaToLuaValue(defaultColors.outlineVariant))
+        colorSchemeTable.set("scrim", LuaBridge.javaToLuaValue(defaultColors.scrim))
+        mtTable.set("colorScheme", colorSchemeTable)
+        mtTable.set("colors", colorSchemeTable) // Alias for convenience
+
+        val defaultShapes = androidx.compose.material3.Shapes()
+        val shapesTable = LuaTable()
+        shapesTable.set("extraSmall", LuaBridge.javaToLuaValue(defaultShapes.extraSmall))
+        shapesTable.set("small", LuaBridge.javaToLuaValue(defaultShapes.small))
+        shapesTable.set("medium", LuaBridge.javaToLuaValue(defaultShapes.medium))
+        shapesTable.set("large", LuaBridge.javaToLuaValue(defaultShapes.large))
+        shapesTable.set("extraLarge", LuaBridge.javaToLuaValue(defaultShapes.extraLarge))
+        mtTable.set("shapes", shapesTable)
+        mtTable.set("shape", shapesTable) // Alias for convenience
+        
         mtTable.set("typography", typographyTable)
         luaTable.set("MaterialTheme", mtTable)
     }

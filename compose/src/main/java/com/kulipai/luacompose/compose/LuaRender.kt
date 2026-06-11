@@ -12,6 +12,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import org.luaj.LuaValue
 
 @Composable
@@ -66,10 +68,28 @@ fun LuaNodeRenderer(node: LuaNode, parentComposeScope: Any? = null) {
     val finalProps = node.props.toMutableMap()
     finalProps["modifier"] = finalModifier
 
+    if (node.type == "LuaError") {
+        androidx.compose.foundation.layout.Column(
+            modifier = Modifier.verticalScroll(rememberScrollState())
+        ) {
+            androidx.compose.material3.Text(
+                text = node.props["text"]?.toString() ?: "Unknown Lua Error",
+                color = Color.Red,
+                modifier = Modifier.padding(16.dp),
+                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium
+            )
+        }
+        return
+    }
+
     val renderer = LuaComposeRegistry.components[node.type]
     if (renderer != null) {
         renderer(finalProps, node.childScope)
     } else {
-        Text("组件 [${node.type}] 未在注册表注册", color = Color.Red, modifier = Modifier.padding(8.dp))
+        androidx.compose.material3.Text(
+            text = "组件 [${node.type}] 未在注册表注册",
+            color = Color.Red,
+            modifier = Modifier.padding(8.dp)
+        )
     }
 }

@@ -112,7 +112,7 @@ fun loadLuaScope(context: Context): LuaScope {
 
     // 2. 初始化 Kotlin 侧实现的 Compose DSL 库
     val composeLib = com.kulipai.luacompose.compose.LuaComposeLib()
-    globals.set("compose", composeLib)
+    composeLib.call(org.luaj.LuaValue.valueOf("compose"), globals)
 
     // 3. 注册 Modifier 全局对象
     globals.set("Modifier", object : ZeroArgFunction() {

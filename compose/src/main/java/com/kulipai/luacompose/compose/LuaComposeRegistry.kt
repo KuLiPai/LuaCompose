@@ -7,6 +7,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import com.kulipai.luacompose.compose.plugins.AnimationPlugin
 import com.kulipai.luacompose.compose.plugins.FoundationPlugin
 import com.kulipai.luacompose.compose.plugins.LuaComposePlugin
 import com.kulipai.luacompose.compose.plugins.Material3Plugin
@@ -130,6 +131,7 @@ object LuaComposeRegistry {
     init {
         registerPlugin(FoundationPlugin())
         registerPlugin(Material3Plugin())
+        registerPlugin(AnimationPlugin())
     }
 
     fun registerPlugin(plugin: LuaComposePlugin) {

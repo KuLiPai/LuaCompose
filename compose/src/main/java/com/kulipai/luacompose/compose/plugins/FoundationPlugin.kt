@@ -326,9 +326,66 @@ class FoundationPlugin : LuaComposePlugin {
         })
         val colorTable = LuaTable()
         colorTable.setmetatable(colorTableMeta)
-
-
         luaTable.set("Color", colorTable)
+
+
+        
+        // ------------------- TransformOrigin ---------------
+        val transformOriginMethods = LuaTable()
+        transformOriginMethods.set("copy", object : org.luaj.lib.VarArgFunction() {
+            override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
+                val self = args.arg1().checkuserdata() as androidx.compose.ui.graphics.TransformOrigin
+                val pivotFractionX = args.arg(2).optdouble(self.pivotFractionX.toDouble()).toFloat()
+                val pivotFractionY = args.arg(3).optdouble(self.pivotFractionY.toDouble()).toFloat()
+                val newInstance = LuaBridge.javaToLuaValue(androidx.compose.ui.graphics.TransformOrigin(pivotFractionX, pivotFractionY))
+                newInstance.setmetatable(args.arg1().getmetatable())
+                return newInstance
+            }
+        })
+        
+        fun wrapTransformOrigin(to: androidx.compose.ui.graphics.TransformOrigin): LuaValue {
+            val instance = LuaBridge.javaToLuaValue(to)
+            val oldMeta = instance.getmetatable()
+            val newMeta = LuaTable()
+            newMeta.set("__index", object : org.luaj.lib.TwoArgFunction() {
+                override fun call(obj: LuaValue, key: LuaValue): LuaValue {
+                    val realObj = obj.checkuserdata() as androidx.compose.ui.graphics.TransformOrigin
+                    val k = key.tojstring()
+                    if (k == "pivotFractionX") return LuaValue.valueOf(realObj.pivotFractionX.toDouble())
+                    if (k == "pivotFractionY") return LuaValue.valueOf(realObj.pivotFractionY.toDouble())
+                    
+                    val custom = transformOriginMethods.get(key)
+                    if (!custom.isnil()) return custom
+                    
+                    if (oldMeta != null) return oldMeta.get(key)
+                    return LuaValue.NIL
+                }
+            })
+            instance.setmetatable(newMeta)
+            return instance
+        }
+        
+        val transformOriginMeta = LuaTable()
+        transformOriginMeta.set("__index", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(table: LuaValue, key: LuaValue): LuaValue {
+                if (key.tojstring() == "Center") {
+                    return wrapTransformOrigin(androidx.compose.ui.graphics.TransformOrigin.Center)
+                }
+                return LuaValue.NIL
+            }
+        })
+        transformOriginMeta.set("__call", object : org.luaj.lib.VarArgFunction() {
+            override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
+                val pivotFractionX = args.arg(2).optdouble(0.5).toFloat()
+                val pivotFractionY = args.arg(3).optdouble(0.5).toFloat()
+                return wrapTransformOrigin(androidx.compose.ui.graphics.TransformOrigin(pivotFractionX, pivotFractionY))
+            }
+        })
+        
+        val transformOriginTable = LuaTable()
+        transformOriginTable.setmetatable(transformOriginMeta)
+        luaTable.set("TransformOrigin", transformOriginTable)
+
 
 
     }

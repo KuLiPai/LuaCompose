@@ -309,12 +309,9 @@ class LuaAnimatableState<T, V : AnimationVector>(
     
     var currentSpec: androidx.compose.animation.core.AnimationSpec<T>? = null
     val animatable = Animatable(initialValue, typeConverter)
-    private var job: Job? = null
-
     fun animateTo(target: T) {
         if (animatable.targetValue == target) return
-        job?.cancel()
-        job = scope.coroutineScope?.launch {
+        scope.coroutineScope?.launch {
             val block: Animatable<T, V>.() -> Unit = {
                 if (composeState is androidx.compose.runtime.MutableState<Any?>) {
                     val ms = composeState as androidx.compose.runtime.MutableState<Any?>

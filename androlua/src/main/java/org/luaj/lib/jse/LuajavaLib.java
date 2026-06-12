@@ -230,17 +230,6 @@ public class LuajavaLib extends VarArgFunction {
 
     // import 方法
     public LuaValue bindClassForName(String str) throws ClassNotFoundException {
-
-
-        // TODO 分离这个代码
-        Set<String> composeClass = Set.of(
-                "androidx.compose.ui.graphics.Color"
-        );
-
-        if (composeClass.contains(str)) {
-            str = "com.kulipai.luacompose.compose." + str;
-        }
-
         JavaClass javaClassA;
         try {
             javaClassA = JavaClass.f(str);

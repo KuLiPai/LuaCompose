@@ -17,6 +17,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kulipai.luacompose.compose.LuaBridge
@@ -30,6 +32,7 @@ import org.luaj.LuaFunction
 import org.luaj.LuaTable
 import org.luaj.LuaValue
 import org.luaj.lib.OneArgFunction
+import org.luaj.lib.TwoArgFunction
 
 class FoundationPlugin : LuaComposePlugin {
     override val namespace: String? = null
@@ -182,73 +185,150 @@ class FoundationPlugin : LuaComposePlugin {
 
         // -------------- Alignment ------------------
         val alignmentTable = LuaTable()
-        alignmentTable.set("TopStart",LuaBridge.javaToLuaValue(Alignment.TopStart))
-        alignmentTable.set("TopCenter",LuaBridge.javaToLuaValue(Alignment.TopCenter))
-        alignmentTable.set("TopEnd",LuaBridge.javaToLuaValue(Alignment.TopEnd))
-        alignmentTable.set("CenterStart",LuaBridge.javaToLuaValue(Alignment.CenterStart))
-        alignmentTable.set("Center",LuaBridge.javaToLuaValue(Alignment.Center))
-        alignmentTable.set("CenterEnd",LuaBridge.javaToLuaValue(Alignment.CenterEnd))
-        alignmentTable.set("BottomStart",LuaBridge.javaToLuaValue(Alignment.BottomStart))
-        alignmentTable.set("BottomCenter",LuaBridge.javaToLuaValue(Alignment.BottomCenter))
-        alignmentTable.set("BottomEnd",LuaBridge.javaToLuaValue(Alignment.BottomEnd))
+        alignmentTable.set("TopStart", LuaBridge.javaToLuaValue(Alignment.TopStart))
+        alignmentTable.set("TopCenter", LuaBridge.javaToLuaValue(Alignment.TopCenter))
+        alignmentTable.set("TopEnd", LuaBridge.javaToLuaValue(Alignment.TopEnd))
+        alignmentTable.set("CenterStart", LuaBridge.javaToLuaValue(Alignment.CenterStart))
+        alignmentTable.set("Center", LuaBridge.javaToLuaValue(Alignment.Center))
+        alignmentTable.set("CenterEnd", LuaBridge.javaToLuaValue(Alignment.CenterEnd))
+        alignmentTable.set("BottomStart", LuaBridge.javaToLuaValue(Alignment.BottomStart))
+        alignmentTable.set("BottomCenter", LuaBridge.javaToLuaValue(Alignment.BottomCenter))
+        alignmentTable.set("BottomEnd", LuaBridge.javaToLuaValue(Alignment.BottomEnd))
 
         // 1D Alignment.Verticals.
-        alignmentTable.set("Top",LuaBridge.javaToLuaValue(Alignment.Top))
-        alignmentTable.set("CenterVertically",LuaBridge.javaToLuaValue(Alignment.CenterVertically))
-        alignmentTable.set("Bottom",LuaBridge.javaToLuaValue(Alignment.Bottom))
+        alignmentTable.set("Top", LuaBridge.javaToLuaValue(Alignment.Top))
+        alignmentTable.set("CenterVertically", LuaBridge.javaToLuaValue(Alignment.CenterVertically))
+        alignmentTable.set("Bottom", LuaBridge.javaToLuaValue(Alignment.Bottom))
 
         // 1D Alignment.Horizontals.
-        alignmentTable.set("Start",LuaBridge.javaToLuaValue(Alignment.Start))
-        alignmentTable.set("CenterHorizontally",LuaBridge.javaToLuaValue(Alignment.CenterHorizontally))
-        alignmentTable.set("End",LuaBridge.javaToLuaValue(Alignment.End))
+        alignmentTable.set("Start", LuaBridge.javaToLuaValue(Alignment.Start))
+        alignmentTable.set(
+            "CenterHorizontally",
+            LuaBridge.javaToLuaValue(Alignment.CenterHorizontally)
+        )
+        alignmentTable.set("End", LuaBridge.javaToLuaValue(Alignment.End))
 
         luaTable.set("Alignment", alignmentTable)
 
         // -------------- FontWeight ------------------
 
-        val fontWeightTable = LuaTable()
+        val fontWeightCompanionTable = LuaTable()
+
         /** [Thin] */
-        fontWeightTable.set("W100", LuaBridge.javaToLuaValue(FontWeight.W100))
+        fontWeightCompanionTable.set("W100", LuaBridge.javaToLuaValue(FontWeight.W100))
         /** [ExtraLight] */
-        fontWeightTable.set("W200", LuaBridge.javaToLuaValue(FontWeight.W200))
+        fontWeightCompanionTable.set("W200", LuaBridge.javaToLuaValue(FontWeight.W200))
         /** [Light] */
-        fontWeightTable.set("W300", LuaBridge.javaToLuaValue(FontWeight.W300))
+        fontWeightCompanionTable.set("W300", LuaBridge.javaToLuaValue(FontWeight.W300))
         /** [Normal] / regular / plain */
-        fontWeightTable.set("W400", LuaBridge.javaToLuaValue(FontWeight.W400))
+        fontWeightCompanionTable.set("W400", LuaBridge.javaToLuaValue(FontWeight.W400))
         /** [Medium] */
-        fontWeightTable.set("W500", LuaBridge.javaToLuaValue(FontWeight.W500))
+        fontWeightCompanionTable.set("W500", LuaBridge.javaToLuaValue(FontWeight.W500))
         /** [SemiBold] */
-        fontWeightTable.set("W600", LuaBridge.javaToLuaValue(FontWeight.W600))
+        fontWeightCompanionTable.set("W600", LuaBridge.javaToLuaValue(FontWeight.W600))
         /** [Bold] */
-        fontWeightTable.set("W700", LuaBridge.javaToLuaValue(FontWeight.W700))
+        fontWeightCompanionTable.set("W700", LuaBridge.javaToLuaValue(FontWeight.W700))
         /** [ExtraBold] */
-        fontWeightTable.set("W800", LuaBridge.javaToLuaValue(FontWeight.W800))
+        fontWeightCompanionTable.set("W800", LuaBridge.javaToLuaValue(FontWeight.W800))
         /** [Black] */
-        fontWeightTable.set("W900", LuaBridge.javaToLuaValue(FontWeight.W900))
+        fontWeightCompanionTable.set("W900", LuaBridge.javaToLuaValue(FontWeight.W900))
         /** Alias for [W100] */
-        fontWeightTable.set("Thin", LuaBridge.javaToLuaValue(FontWeight.Thin))
+        fontWeightCompanionTable.set("Thin", LuaBridge.javaToLuaValue(FontWeight.Thin))
         /** Alias for [W200] */
-        fontWeightTable.set("ExtraLight", LuaBridge.javaToLuaValue(FontWeight.ExtraLight))
+        fontWeightCompanionTable.set("ExtraLight", LuaBridge.javaToLuaValue(FontWeight.ExtraLight))
         /** Alias for [W300] */
-        fontWeightTable.set("Light", LuaBridge.javaToLuaValue(FontWeight.Light))
+        fontWeightCompanionTable.set("Light", LuaBridge.javaToLuaValue(FontWeight.Light))
         /** The default font weight - alias for [W400] */
-        fontWeightTable.set("Normal", LuaBridge.javaToLuaValue(FontWeight.Normal))
+        fontWeightCompanionTable.set("Normal", LuaBridge.javaToLuaValue(FontWeight.Normal))
         /** Alias for [W500] */
-        fontWeightTable.set("Medium", LuaBridge.javaToLuaValue(FontWeight.Medium))
+        fontWeightCompanionTable.set("Medium", LuaBridge.javaToLuaValue(FontWeight.Medium))
         /** Alias for [W600] */
-        fontWeightTable.set("SemiBold", LuaBridge.javaToLuaValue(FontWeight.SemiBold))
+        fontWeightCompanionTable.set("SemiBold", LuaBridge.javaToLuaValue(FontWeight.SemiBold))
         /** A commonly used font weight that is heavier than normal - alias for [W700] */
-        fontWeightTable.set("Bold", LuaBridge.javaToLuaValue(FontWeight.Bold))
+        fontWeightCompanionTable.set("Bold", LuaBridge.javaToLuaValue(FontWeight.Bold))
         /** Alias for [W800] */
-        fontWeightTable.set("ExtraBold", LuaBridge.javaToLuaValue(FontWeight.ExtraBold))
+        fontWeightCompanionTable.set("ExtraBold", LuaBridge.javaToLuaValue(FontWeight.ExtraBold))
         /** Alias for [W900] */
-        fontWeightTable.set("Black", LuaBridge.javaToLuaValue(FontWeight.Black))
+        fontWeightCompanionTable.set("Black", LuaBridge.javaToLuaValue(FontWeight.Black))
+
+        val fontWeightTableMeta = LuaTable()
+        fontWeightTableMeta.set("__index", object : TwoArgFunction() {
+            override fun call(table: LuaValue, key: LuaValue): LuaValue {
+                return fontWeightCompanionTable[key.checkjstring()]
+            }
+        })
+        fontWeightTableMeta.set("__call", object : TwoArgFunction() {
+            override fun call(table: LuaValue, params: LuaValue): LuaValue {
+                return LuaBridge.javaToLuaValue(FontWeight(params.checkint()))
+            }
+        })
+        val fontWeightTable = LuaTable()
+        fontWeightTable.setmetatable(fontWeightTableMeta)
+
 
         luaTable.set("FontWeight", fontWeightTable)
 
+        // -------------- Color ------------------
+        val colorCompanionTable = LuaTable()
+        colorCompanionTable.set("Black", LuaBridge.javaToLuaValue(Color.Black))
+        colorCompanionTable.set("DarkGray", LuaBridge.javaToLuaValue(Color.DarkGray))
+        colorCompanionTable.set("Gray", LuaBridge.javaToLuaValue(Color.Gray))
+        colorCompanionTable.set("LightGray", LuaBridge.javaToLuaValue(Color.LightGray))
+        colorCompanionTable.set("White", LuaBridge.javaToLuaValue(Color.White))
+        colorCompanionTable.set("Red", LuaBridge.javaToLuaValue(Color.Red))
+        colorCompanionTable.set("Green", LuaBridge.javaToLuaValue(Color.Green))
+        colorCompanionTable.set("Blue", LuaBridge.javaToLuaValue(Color.Blue))
+        colorCompanionTable.set("Yellow", LuaBridge.javaToLuaValue(Color.Yellow))
+        colorCompanionTable.set("Cyan", LuaBridge.javaToLuaValue(Color.Cyan))
+        colorCompanionTable.set("Magenta", LuaBridge.javaToLuaValue(Color.Magenta))
+        colorCompanionTable.set("Transparent", LuaBridge.javaToLuaValue(Color.Transparent))
+        colorCompanionTable.set("Unspecified", LuaBridge.javaToLuaValue(Color.Unspecified))
+
+        val colorInstanceMeta = LuaTable()
+        val colorMethods = LuaTable()
+        colorMethods.set("luminance", object : OneArgFunction() {
+            override fun call(self: LuaValue): LuaValue {
+                val colorJava = self.checkuserdata(Color::class.java) as Color
+                return LuaBridge.javaToLuaValue(colorJava.luminance())
+            }
+        })
+
+        val colorTableMeta = LuaTable()
+        colorTableMeta.set("__index", object : TwoArgFunction() {
+            override fun call(table: LuaValue, key: LuaValue): LuaValue {
+                return colorCompanionTable[key.checkjstring()]
+            }
+        })
+        colorTableMeta.set("__call", object : TwoArgFunction() {
+            override fun call(table: LuaValue, params: LuaValue): LuaValue {
+                val instance = LuaBridge.javaToLuaValue(Color(params.checkint()))
+
+                val oldMeta = instance.getmetatable()
+                val newMeta = LuaTable()
+                newMeta.set("__index", object : TwoArgFunction() {
+                    override fun call(obj: LuaValue, key: LuaValue): LuaValue {
+                        // 1. 先找自定义方法
+                        val custom = colorMethods.get(key)
+                        if (!custom.isnil()) return custom
+
+                        // 2. 自定义没有，直接从旧元表里 get 这个 key
+                        if (oldMeta != null) {
+                            return oldMeta.get(key) // 或者写成 oldMeta[key]
+                        }
+
+                        return LuaValue.NIL
+                    }
+                })
+
+                instance.setmetatable(newMeta)
+                return instance
+            }
+        })
+        val colorTable = LuaTable()
+        colorTable.setmetatable(colorTableMeta)
 
 
-
+        luaTable.set("Color", colorTable)
 
 
     }

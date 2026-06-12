@@ -50,3 +50,20 @@ fun resolveSp(value: Any?): androidx.compose.ui.unit.TextUnit {
         else -> androidx.compose.ui.unit.TextUnit.Unspecified
     }
 }
+
+fun resolveShape(shapeProp: Any?): androidx.compose.ui.graphics.Shape? {
+    if (shapeProp is androidx.compose.ui.graphics.Shape) return shapeProp
+    if (shapeProp is String) {
+        return when (shapeProp.lowercase()) {
+            "circle", "circleshape" -> androidx.compose.foundation.shape.CircleShape
+            "rounded", "roundedcornershape" -> androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+            "rectangle", "rectangleshape" -> androidx.compose.ui.graphics.RectangleShape
+            else -> null
+        }
+    }
+    if (shapeProp is org.luaj.LuaValue && shapeProp.isuserdata()) {
+        val ud = shapeProp.checkuserdata()
+        if (ud is androidx.compose.ui.graphics.Shape) return ud
+    }
+    return null
+}

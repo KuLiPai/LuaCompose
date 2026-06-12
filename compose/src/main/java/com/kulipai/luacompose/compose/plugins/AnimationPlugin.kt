@@ -19,6 +19,9 @@ import org.luaj.LuaFunction
 import org.luaj.LuaTable
 import org.luaj.LuaValue
 
+
+class LuaContentTransform(val transform: androidx.compose.animation.ContentTransform) : org.luaj.LuaUserdata(transform)
+
 class LuaEnterTransition(val transition: EnterTransition) : org.luaj.LuaUserdata(transition) {
     init {
         val meta = LuaTable()
@@ -30,6 +33,17 @@ class LuaEnterTransition(val transition: EnterTransition) : org.luaj.LuaUserdata
                 return arg1
             }
         })
+        meta.set("togetherWith", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(self: LuaValue, exitVal: LuaValue): LuaValue {
+                val enter = (self as LuaEnterTransition).transition
+                var exit: androidx.compose.animation.ExitTransition = androidx.compose.animation.fadeOut()
+                if (exitVal is LuaExitTransition) exit = exitVal.transition
+                else if (exitVal.isuserdata() && exitVal.checkuserdata() is androidx.compose.animation.ExitTransition) exit = exitVal.checkuserdata() as androidx.compose.animation.ExitTransition
+                
+                return LuaContentTransform(enter.togetherWith(exit))
+            }
+        })
+        meta.set("__index", meta)
         setmetatable(meta)
     }
 }
@@ -54,6 +68,55 @@ class AnimationPlugin : LuaComposePlugin {
 
     override fun getComponents(): Map<String, @Composable (props: Map<String, Any?>, childScope: LuaScope?) -> Unit> {
         return mapOf(
+            
+            "AnimatedContent" to { props, childScope ->
+                val targetState = props["targetState"]
+                val modifier = resolveModifier(props["modifier"])
+                val transitionSpecObj = props["transitionSpec"]
+                
+                var actualChildScope = childScope
+                val contentObj = props["content"]
+                if (actualChildScope == null && contentObj is LuaFunction) {
+                    actualChildScope = LuaScope(contentObj)
+                }
+
+                val actualTarget = targetState
+
+                AnimatedContent(
+                    targetState = actualTarget,
+                    modifier = modifier,
+                    transitionSpec = {
+                        var transform: ContentTransform = fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith fadeOut(animationSpec = tween(90))
+                        if (transitionSpecObj is LuaFunction) {
+                            try {
+                                val scopeTable = LuaTable()
+                                scopeTable.set("initialState", LuaBridge.javaToLuaValue(this.initialState))
+                                scopeTable.set("targetState", LuaBridge.javaToLuaValue(this.targetState))
+                                scopeTable.set("isTransitioningTo", object : org.luaj.lib.TwoArgFunction() {
+                                    override fun call(arg1: LuaValue, arg2: LuaValue): LuaValue {
+                                        val isMatch = this@AnimatedContent.initialState == LuaBridge.luaValueToJava(arg1) && 
+                                                      this@AnimatedContent.targetState == LuaBridge.luaValueToJava(arg2)
+                                        return LuaValue.valueOf(isMatch)
+                                    }
+                                })
+                                val res = transitionSpecObj.call(scopeTable)
+                                if (res is LuaContentTransform) {
+                                    transform = res.transform
+                                } else if (res.isuserdata() && res.checkuserdata() is ContentTransform) {
+                                    transform = res.checkuserdata() as ContentTransform
+                                }
+                            } catch (e: Exception) { e.printStackTrace() }
+                        }
+                        transform
+                    },
+                    label = props["label"] as? String ?: "AnimatedContent"
+                ) { stateValue ->
+                    if (actualChildScope != null) {
+                        LuaScopeComponent(actualChildScope, this, LuaBridge.javaToLuaValue(stateValue))
+                    }
+                }
+            },
+
             "AnimatedVisibility" to { props, childScope ->
                 val visible = props["visible"] as? Boolean ?: true
                 val modifier = resolveModifier(props["modifier"])
@@ -481,7 +544,23 @@ class AnimationPlugin : LuaComposePlugin {
             }
         })
 
-        luaTable.set("animateColorAsState", object : org.luaj.lib.VarArgFunction() {
+        
+        luaTable.set("togetherWith", object : org.luaj.lib.TwoArgFunction() {
+            override fun call(arg1: LuaValue, arg2: LuaValue): LuaValue {
+                var enter: androidx.compose.animation.EnterTransition = androidx.compose.animation.fadeIn()
+                var exit: androidx.compose.animation.ExitTransition = androidx.compose.animation.fadeOut()
+                
+                if (arg1 is LuaEnterTransition) enter = arg1.transition
+                else if (arg1.isuserdata() && arg1.checkuserdata() is androidx.compose.animation.EnterTransition) enter = arg1.checkuserdata() as androidx.compose.animation.EnterTransition
+                
+                if (arg2 is LuaExitTransition) exit = arg2.transition
+                else if (arg2.isuserdata() && arg2.checkuserdata() is androidx.compose.animation.ExitTransition) exit = arg2.checkuserdata() as androidx.compose.animation.ExitTransition
+                
+                return LuaContentTransform(enter.togetherWith(exit))
+            }
+        })
+
+luaTable.set("animateColorAsState", object : org.luaj.lib.VarArgFunction() {
             override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
                 val (targetValue, spec) = resolveAnimationArgs(args)
                 val target = resolveColor(LuaBridge.luaValueToJava(targetValue))
@@ -504,6 +583,27 @@ class AnimationPlugin : LuaComposePlugin {
                 return org.luaj.LuaValue.NIL
             }
         })
+
+
+        // ------------------ Spring ------------------
+        val springTable = LuaTable()
+        springTable.set("StiffnessHigh", LuaBridge.javaToLuaValue(Spring.StiffnessHigh))
+        springTable.set("StiffnessMedium", LuaBridge.javaToLuaValue(Spring.StiffnessMedium))
+        springTable.set("StiffnessMediumLow", LuaBridge.javaToLuaValue(Spring.StiffnessMediumLow))
+        springTable.set("StiffnessLow", LuaBridge.javaToLuaValue(Spring.StiffnessLow))
+        springTable.set("StiffnessVeryLow", LuaBridge.javaToLuaValue(Spring.StiffnessVeryLow))
+        springTable.set("DampingRatioHighBouncy", LuaBridge.javaToLuaValue(Spring.DampingRatioHighBouncy))
+        springTable.set("DampingRatioMediumBouncy", LuaBridge.javaToLuaValue(Spring.DampingRatioMediumBouncy))
+        springTable.set("DampingRatioLowBouncy", LuaBridge.javaToLuaValue(Spring.DampingRatioLowBouncy))
+        springTable.set("DampingRatioNoBouncy", LuaBridge.javaToLuaValue(Spring.DampingRatioNoBouncy))
+        springTable.set("DefaultDisplacementThreshold", LuaBridge.javaToLuaValue(Spring.DefaultDisplacementThreshold))
+
+
+        luaTable.set("Spring",springTable)
+
+
+
+
     }
 }
 

@@ -21,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.rotate
 import org.luaj.LuaFunction
 import org.luaj.LuaValue
 import androidx.compose.animation.animateContentSize
@@ -49,12 +50,20 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         try { modifier = modifier.background(resolveColor(colorProp)) } catch (e: Exception) { e.printStackTrace() }
         return this
     }
-    fun background(colorProp: Any, shape: Shape): LuaModifier {
-        try { modifier = modifier.background(resolveColor(colorProp), shape) } catch (e: Exception) { e.printStackTrace() }
+    fun background(colorProp: Any, shapeProp: Any): LuaModifier {
+        val resolvedShape = resolveShape(shapeProp)
+        try { 
+            if (resolvedShape != null) {
+                modifier = modifier.background(resolveColor(colorProp), resolvedShape) 
+            } else {
+                modifier = modifier.background(resolveColor(colorProp))
+            }
+        } catch (e: Exception) { e.printStackTrace() }
         return this
     }
     fun alpha(alpha: Float): LuaModifier { modifier = modifier.alpha(alpha); return this }
     fun aspectRatio(ratio: Float): LuaModifier { modifier = modifier.aspectRatio(ratio); return this }
+    fun rotate(degrees: Float): LuaModifier { modifier = modifier.rotate(degrees); return this }
     fun offset(x: Any, y: Any): LuaModifier { modifier = modifier.offset(resolveDp(x), resolveDp(y)); return this }
     
     fun clickable(onClick: LuaFunction): LuaModifier {
@@ -99,14 +108,23 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     
     fun clip(shape: String, radius: Int): LuaModifier {
         val clipShape = when (shape.lowercase()) {
-            "circle" -> CircleShape
-            "rounded" -> RoundedCornerShape(radius.dp)
+            "circle", "circleshape" -> CircleShape
+            "rounded", "roundedcornershape" -> RoundedCornerShape(radius.dp)
+            "rectangle", "rectangleshape" -> androidx.compose.ui.graphics.RectangleShape
             else -> null
         }
         if (clipShape != null) { modifier = modifier.clip(clipShape) }
         return this
     }
-    fun clip(shape: String): LuaModifier = clip(shape, 0)
+    fun clip(shapeProp: Any): LuaModifier {
+        val clipShape = resolveShape(shapeProp)
+        if (clipShape != null) { modifier = modifier.clip(clipShape) }
+        return this
+    }
+    fun clip(shape: Shape): LuaModifier {
+        modifier = modifier.clip(shape)
+        return this
+    }
     
     fun border(width: Int, color: Any): LuaModifier {
         try { modifier = modifier.border(width.dp, resolveColor(color)) } catch (e: Exception) { e.printStackTrace() }
@@ -115,4 +133,84 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     
     fun align(alignStr: String): LuaModifier { this.alignmentStr = alignStr; return this }
     fun weight(weight: Float): LuaModifier { this.weightVal = weight; return this }
+
+    private fun anyFromLua(v: LuaValue?): Any? = if (v == null || v.isnil()) null else LuaBridge.luaValueToJava(v)
+
+    fun padding(table: org.luaj.LuaTable): LuaModifier {
+        val all = anyFromLua(table.get("all").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() && table.length() == 1 })
+        if (all != null) return padding(all)
+        
+        val horizontal = anyFromLua(table.get("horizontal").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() && table.length() == 2 })
+        val vertical = anyFromLua(table.get("vertical").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() && table.length() == 2 })
+        if (horizontal != null || vertical != null) return padding(horizontal ?: 0, vertical ?: 0)
+        
+        val start = anyFromLua(table.get("start").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() && table.length() == 4 })
+        val top = anyFromLua(table.get("top").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() && table.length() == 4 })
+        val end = anyFromLua(table.get("end").takeIf { !it.isnil() } ?: table.get(3).takeIf { !it.isnil() && table.length() == 4 })
+        val bottom = anyFromLua(table.get("bottom").takeIf { !it.isnil() } ?: table.get(4).takeIf { !it.isnil() && table.length() == 4 })
+        if (start != null || top != null || end != null || bottom != null) {
+            return padding(start ?: 0, top ?: 0, end ?: 0, bottom ?: 0)
+        }
+        return this
+    }
+
+    fun size(table: org.luaj.LuaTable): LuaModifier {
+        val size = anyFromLua(table.get("size").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() && table.length() == 1 })
+        if (size != null) return size(size)
+        
+        val width = anyFromLua(table.get("width").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() && table.length() == 2 })
+        val height = anyFromLua(table.get("height").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() && table.length() == 2 })
+        if (width != null || height != null) return size(width ?: 0, height ?: 0)
+        
+        return this
+    }
+
+    fun offset(table: org.luaj.LuaTable): LuaModifier {
+        val x = anyFromLua(table.get("x").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() })
+        val y = anyFromLua(table.get("y").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() })
+        if (x != null || y != null) return offset(x ?: 0, y ?: 0)
+        return this
+    }
+
+    fun background(table: org.luaj.LuaTable): LuaModifier {
+        val color = anyFromLua(table.get("color").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() })
+        val shape = anyFromLua(table.get("shape").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() })
+        if (color != null) {
+            if (shape != null) return background(color, shape)
+            return background(color)
+        }
+        return this
+    }
+
+    fun clip(table: org.luaj.LuaTable): LuaModifier {
+        val shape = anyFromLua(table.get("shape").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() })
+        if (shape != null) return clip(shape)
+        return this
+    }
+
+    fun rotate(table: org.luaj.LuaTable): LuaModifier {
+        val degrees = anyFromLua(table.get("degrees").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() })
+        if (degrees != null && degrees is Number) return rotate(degrees.toFloat())
+        return this
+    }
+
+    fun border(table: org.luaj.LuaTable): LuaModifier {
+        val width = anyFromLua(table.get("width").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() })
+        val color = anyFromLua(table.get("color").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() })
+        val shape = anyFromLua(table.get("shape").takeIf { !it.isnil() } ?: table.get(3).takeIf { !it.isnil() })
+        
+        if (width != null && color != null) {
+            val resolvedShape = resolveShape(shape)
+            val w = resolveDp(width)
+            val c = resolveColor(color)
+            try { 
+                if (resolvedShape != null) {
+                    modifier = modifier.border(w, c, resolvedShape)
+                } else {
+                    modifier = modifier.border(w, c)
+                }
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+        return this
+    }
 }

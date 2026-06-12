@@ -156,15 +156,36 @@ class FoundationPlugin : LuaComposePlugin {
         arrangementTable.set("Top", LuaBridge.javaToLuaValue(Arrangement.Top))
         arrangementTable.set("Center", LuaBridge.javaToLuaValue(Arrangement.Center))
         arrangementTable.set("Start", LuaBridge.javaToLuaValue(Arrangement.Start))
-        arrangementTable.set("Start", LuaBridge.javaToLuaValue(Arrangement.Start))
+        arrangementTable.set("End", LuaBridge.javaToLuaValue(Arrangement.End))
         arrangementTable.set("Bottom", LuaBridge.javaToLuaValue(Arrangement.Bottom))
         arrangementTable.set("SpaceAround", LuaBridge.javaToLuaValue(Arrangement.SpaceAround))
         arrangementTable.set("SpaceBetween", LuaBridge.javaToLuaValue(Arrangement.SpaceBetween))
         arrangementTable.set("SpaceEvenly", LuaBridge.javaToLuaValue(Arrangement.SpaceEvenly))
-        arrangementTable.set("spacedBy", object : OneArgFunction() {
-            override fun call(arg: LuaValue): LuaValue {
-                val space = resolveDp(LuaBridge.luaValueToJava(arg))
-                return LuaBridge.javaToLuaValue(Arrangement.spacedBy(space))
+        arrangementTable.set("spacedBy", object : org.luaj.lib.VarArgFunction() {
+            override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
+                val arg1 = args.arg1()
+                var spaceObj: org.luaj.LuaValue = org.luaj.LuaValue.NIL
+                var alignmentObj: org.luaj.LuaValue = org.luaj.LuaValue.NIL
+
+                if (arg1.istable()) {
+                    val sp = arg1.get("space")
+                    spaceObj = if (!sp.isnil()) sp else arg1.get(1)
+                    val al = arg1.get("alignment")
+                    alignmentObj = if (!al.isnil()) al else arg1.get(2)
+                } else {
+                    spaceObj = arg1
+                    alignmentObj = args.arg(2)
+                }
+
+                val space = resolveDp(LuaBridge.luaValueToJava(spaceObj))
+                val javaAlign = LuaBridge.luaValueToJava(alignmentObj)
+
+                if (javaAlign is androidx.compose.ui.Alignment.Horizontal) {
+                    return LuaBridge.javaToLuaValue(androidx.compose.foundation.layout.Arrangement.spacedBy(space, javaAlign))
+                } else if (javaAlign is androidx.compose.ui.Alignment.Vertical) {
+                    return LuaBridge.javaToLuaValue(androidx.compose.foundation.layout.Arrangement.spacedBy(space, javaAlign))
+                }
+                return LuaBridge.javaToLuaValue(androidx.compose.foundation.layout.Arrangement.spacedBy(space))
             }
         })
 
@@ -385,6 +406,8 @@ class FoundationPlugin : LuaComposePlugin {
         val transformOriginTable = LuaTable()
         transformOriginTable.setmetatable(transformOriginMeta)
         luaTable.set("TransformOrigin", transformOriginTable)
+
+
 
 
 

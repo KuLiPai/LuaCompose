@@ -67,6 +67,48 @@ object LuaComposeLib {
             ComposeBridge.engine.createNil()
         })
 
+        composeTable.set("key", ComposeBridge.engine.createFunction { args ->
+            val scope = ComposeBridge.getActiveScope()
+                ?: throw RuntimeException("compose.key() 必须在 Compose 上下文中调用")
+            
+            val numArgs = args.size
+            if (numArgs == 0) return@createFunction ComposeBridge.engine.createNil()
+            
+            val contentFunc = args[numArgs - 1]
+            if (!contentFunc.isFunction()) return@createFunction ComposeBridge.engine.createNil()
+            
+            val keys = mutableListOf<Any>()
+            for (i in 0 until numArgs - 1) {
+                keys.add(ComposeBridge.scriptToJava(args[i]) ?: "nil")
+            }
+            val stringKey = "key_${keys.joinToString("_")}"
+            
+            val childScope = scope.getOrCreateChildScope(contentFunc.asFunction(), stringKey)
+            
+            ComposeBridge.pushActiveScope(childScope)
+            childScope.statesCount = 0
+            childScope.remembersCount = 0
+            childScope.childScopesCount = 0
+            childScope.accessedStates.clear()
+            childScope.accessedRemembers.clear()
+            childScope.accessedChildScopes.clear()
+            
+            var result: ScriptValue = ComposeBridge.engine.createNil()
+            try {
+                result = contentFunc.asFunction().call()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                ComposeBridge.popActiveScope()
+            }
+            
+            childScope.states.keys.retainAll(childScope.accessedStates)
+            childScope.remembers.keys.retainAll(childScope.accessedRemembers)
+            childScope.childScopes.keys.retainAll(childScope.accessedChildScopes)
+            
+            result
+        })
+
         composeTable.set("DisposableEffect", ComposeBridge.engine.createFunction { args ->
             val effectFunc = args[0]
             val activeScope = ComposeBridge.getActiveScope()

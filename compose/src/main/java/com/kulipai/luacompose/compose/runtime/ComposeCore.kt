@@ -190,18 +190,18 @@ class ComposeScope(var contentFunc: ScriptFunction) {
     var typography: Typography? = null
     var shapes: Shapes? = null
 
-    private val states = mutableMapOf<Any, ScriptTable>()
-    private var statesCount = 0
+    internal val states = mutableMapOf<Any, ScriptTable>()
+    internal var statesCount = 0
 
-    private val remembers = mutableMapOf<Any, Any?>()
-    private var remembersCount = 0
+    internal val remembers = mutableMapOf<Any, Any?>()
+    internal var remembersCount = 0
 
-    private val childScopes = mutableMapOf<Any, ComposeScope>()
-    private var childScopesCount = 0
+    internal val childScopes = mutableMapOf<Any, ComposeScope>()
+    internal var childScopesCount = 0
 
-    private val accessedStates = mutableSetOf<Any>()
-    private val accessedRemembers = mutableSetOf<Any>()
-    private val accessedChildScopes = mutableSetOf<Any>()
+    internal val accessedStates = mutableSetOf<Any>()
+    internal val accessedRemembers = mutableSetOf<Any>()
+    internal val accessedChildScopes = mutableSetOf<Any>()
 
     fun getOrCreateState(initialValue: ScriptValue): ScriptTable {
         val actualKey = statesCount++

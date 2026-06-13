@@ -340,6 +340,12 @@ open class ComposeState(initialValue: Any?, val scope: ComposeScope) {
         dependentScopes.add(scope)
     }
 
+    fun invalidateDependents() {
+        for (scope in dependentScopes) {
+            scope.invalidate()
+        }
+    }
+
     open fun get(): Any? {
         val active = ComposeBridge.getActiveScope()
         if (active != null) {

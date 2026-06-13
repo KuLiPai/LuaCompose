@@ -49,8 +49,7 @@ class AnimationCorePlugin : ComposeScriptPlugin {
                             state.animatable.snapTo(target)
                             val ms = state.composeState as? androidx.compose.runtime.MutableState<Any?>
                             if (ms != null) ms.value = target
-                            state.registerDependency(state.scope)
-                            state.scope.invalidate() // Optional, dependentScopes usually handles it, but maybe safer
+                            state.invalidateDependents()
                         }
                         engine.createNil()
                     }
@@ -74,6 +73,7 @@ class AnimationCorePlugin : ComposeScriptPlugin {
                             val block: Animatable<Float, AnimationVector1D>.() -> Unit = {
                                 val ms = state.composeState as? androidx.compose.runtime.MutableState<Any?>
                                 if (ms != null) ms.value = this.value
+                                state.invalidateDependents()
                             }
                             if (spec != null) {
                                 state.animatable.animateTo(target, spec, block = block)

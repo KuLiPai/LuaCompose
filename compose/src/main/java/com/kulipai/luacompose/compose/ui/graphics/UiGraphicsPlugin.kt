@@ -40,6 +40,29 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
 
     override fun injectGlobals(scriptTable: ScriptTable) {
         // -------------- Color ------------------
+                val colorMethods = ComposeBridge.engine.createTable()
+                colorMethods.set("luminance", ComposeBridge.engine.createFunction { args ->
+                    val self = args[0]
+                    val colorJava = self.asTable().get("_javaColor").asUserdata() as Color
+                    ComposeBridge.javaToScript(colorJava.luminance())
+                })
+
+                ComposeBridge.converters[Color::class.java] = { obj ->
+                    val color = obj as Color
+                    val instance = ComposeBridge.engine.createTable()
+                    instance.set("_javaColor", ComposeBridge.engine.createUserdata(color))
+                    
+                    val newMeta = ComposeBridge.engine.createTable()
+                    newMeta.set("__index", ComposeBridge.engine.createFunction { innerArgs ->
+                        val key = innerArgs[1]
+                        val custom = colorMethods.get(key)
+                        if (!custom.isNil()) return@createFunction custom
+                        ComposeBridge.engine.createNil()
+                    })
+                    instance.setMetatable(newMeta)
+                    instance
+                }
+
                 val colorCompanionTable = ComposeBridge.engine.createTable()
                 colorCompanionTable.set("Black", ComposeBridge.javaToScript(Color.Black))
                 colorCompanionTable.set("DarkGray", ComposeBridge.javaToScript(Color.DarkGray))
@@ -55,13 +78,6 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
                 colorCompanionTable.set("Transparent", ComposeBridge.javaToScript(Color.Transparent))
                 colorCompanionTable.set("Unspecified", ComposeBridge.javaToScript(Color.Unspecified))
         
-                val colorMethods = ComposeBridge.engine.createTable()
-                colorMethods.set("luminance", ComposeBridge.engine.createFunction { args ->
-                    val self = args[0]
-                    val colorJava = self.asUserdata() as Color
-                    ComposeBridge.javaToScript(colorJava.luminance())
-                })
-        
                 val colorTableMeta = ComposeBridge.engine.createTable()
                 colorTableMeta.set("__index", ComposeBridge.engine.createFunction { args ->
                     val key = args[1]
@@ -69,19 +85,8 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
                 })
                 colorTableMeta.set("__call", ComposeBridge.engine.createFunction { args ->
                     val params = args[1]
-                    val instance = ComposeBridge.engine.createTable()
-                    instance.set("_javaColor", ComposeBridge.engine.createUserdata(Color(params.toInt())))
-        
-                    val newMeta = ComposeBridge.engine.createTable()
-                    newMeta.set("__index", ComposeBridge.engine.createFunction { innerArgs ->
-                        val key = innerArgs[1]
-                        val custom = colorMethods.get(key)
-                        if (!custom.isNil()) return@createFunction custom
-                        ComposeBridge.engine.createNil()
-                    })
-        
-                    instance.setMetatable(newMeta)
-                    instance
+                    val colorInt = params.toDouble().toLong().toInt()
+                    ComposeBridge.javaToScript(Color(colorInt))
                 })
                 val colorTable = ComposeBridge.engine.createTable()
                 colorTable.setMetatable(colorTableMeta)

@@ -30,6 +30,8 @@ object ComposeBridge {
 
     private val activeScopes = ThreadLocal.withInitial { Stack<ComposeScope>() }
     private val activeNodeLists = ThreadLocal.withInitial { Stack<MutableList<ComposeNode>>() }
+    
+    val converters = mutableMapOf<Class<*>, (Any) -> ScriptValue>()
 
     fun getActiveScope(): ComposeScope? {
         val stack = activeScopes.get()!!
@@ -78,8 +80,11 @@ object ComposeBridge {
             value.isTable() -> {
                 val table = value.asTable()
                 val isState = table.get("_isState")
+                val isColor = table.get("_javaColor")
                 if (isState.isBoolean() && isState.toBoolean()) {
                     table.get("javaState").asUserdata()
+                } else if (isColor.isUserdata()) {
+                    isColor.asUserdata()
                 } else {
                     val len = table.length()
                     if (len > 0) {
@@ -117,7 +122,15 @@ object ComposeBridge {
             is Float -> engine.createValue(value.toDouble())
             is String -> engine.createValue(value)
             is ScriptValue -> value
-            else -> engine.coerceJavaToScript(value)
+            else -> {
+                val clazz = value::class.java
+                for ((cls, converter) in converters) {
+                    if (cls.isAssignableFrom(clazz)) {
+                        return converter(value)
+                    }
+                }
+                engine.coerceJavaToScript(value)
+            }
         }
     }
 }

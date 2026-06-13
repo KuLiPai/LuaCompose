@@ -61,6 +61,14 @@ object ComposeBridge {
         if (stack.isNotEmpty()) stack.pop()
     }
 
+    private val activeDrawScopes = ThreadLocal.withInitial { java.util.Stack<androidx.compose.ui.graphics.drawscope.DrawScope>() }
+    fun getActiveDrawScope(): androidx.compose.ui.graphics.drawscope.DrawScope? = if (activeDrawScopes.get()!!.isNotEmpty()) activeDrawScopes.get()!!.peek() else null
+    fun pushActiveDrawScope(scope: androidx.compose.ui.graphics.drawscope.DrawScope) { activeDrawScopes.get()!!.push(scope) }
+    fun popActiveDrawScope() {
+        val stack = activeDrawScopes.get()!!
+        if (stack.isNotEmpty()) stack.pop()
+    }
+
     fun scriptToJava(value: ScriptValue?): Any? {
         if (value == null || value.isNil()) return null
         return when {

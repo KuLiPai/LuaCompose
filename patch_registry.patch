@@ -1,0 +1,10 @@
+--- compose/src/main/java/com/kulipai/luacompose/compose/LuaComposeRegistry.kt
++++ compose/src/main/java/com/kulipai/luacompose/compose/LuaComposeRegistry.kt
+@@ -37,6 +37,7 @@
+         registerPlugin(Material3Plugin())
+         registerPlugin(AnimationPlugin())
+         registerPlugin(com.kulipai.luacompose.compose.animation.core.AnimationCorePlugin())
++        registerPlugin(com.kulipai.luacompose.compose.ui.geometry.UiGeometryPlugin())
+     }
+ 
+     fun registerPlugin(plugin: ComposeScriptPlugin) {

@@ -11,9 +11,25 @@ import com.kulipai.luacompose.compose.ui.resolveDp
 import com.kulipai.luacompose.compose.ui.resolveSp
 
 object LuaComposeLib {
+    init {
+        ComposeBridge.converters[androidx.compose.ui.unit.Dp::class.java] = { obj ->
+            val dp = obj as androidx.compose.ui.unit.Dp
+            val table = ComposeBridge.engine.createTable()
+            table.set("value", ComposeBridge.engine.createValue(dp.value.toDouble()))
+            table.set("toPx", ComposeBridge.engine.createFunction { _ ->
+                val density = android.content.res.Resources.getSystem().displayMetrics.density
+                ComposeBridge.engine.createValue((dp.value * density).toDouble())
+            })
+            table.set("_javaDp", ComposeBridge.engine.createUserdata(dp))
+            table
+        }
+    }
+
     var rootContentFunc: ScriptFunction? = null
+    var globalEnv: ScriptTable? = null
 
     fun inject(env: ScriptTable): ScriptTable {
+        globalEnv = env
         val composeTable = ComposeBridge.engine.createTable()
         env.set("compose", composeTable)
 

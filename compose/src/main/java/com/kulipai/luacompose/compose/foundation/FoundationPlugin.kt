@@ -41,7 +41,24 @@ class FoundationPlugin : ComposeScriptPlugin {
         com.kulipai.luacompose.compose.foundation.layout.registerLayoutComponents(map)
         com.kulipai.luacompose.compose.foundation.lazy.registerLazyComponents(map)
 
-        
+        map["Canvas"] = { props, _ ->
+            val modifier = resolveModifier(props["modifier"])
+            val onDraw = props["onDraw"] as? ScriptFunction
+
+            androidx.compose.foundation.Canvas(modifier = modifier) {
+                if (onDraw != null) {
+                    val luaDrawScope = createComposeDrawScope(this)
+                    ComposeBridge.pushActiveDrawScope(this)
+                    try {
+                        onDraw.call(luaDrawScope)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    } finally {
+                        ComposeBridge.popActiveDrawScope()
+                    }
+                }
+            }
+        }
 
         
 

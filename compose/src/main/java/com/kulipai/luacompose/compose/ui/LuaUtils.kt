@@ -32,7 +32,7 @@ fun resolveColor(colorPropRaw: Any?, defaultColor: Color = Color.Unspecified): C
             } catch (_: Exception) { defaultColor }
         }
     }
-    android.util.Log.d("LUA_ANIM", "resolveColor received: ${colorProp?.javaClass?.name} - returned: $result")
+
     return result
 }
 

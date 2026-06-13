@@ -1,0 +1,11 @@
+--- compose/src/main/java/com/kulipai/luacompose/compose/runtime/ComposeCore.kt
++++ compose/src/main/java/com/kulipai/luacompose/compose/runtime/ComposeCore.kt
+@@ -344,7 +344,7 @@
+         scope.coroutineScope?.launch {
+             android.util.Log.d("LuaCompose", "Starting animation to $target with spec $currentSpec")
+             val block: Animatable<T, V>.() -> Unit = {
+-                // android.util.Log.d("LuaCompose", "Animation frame: ${this.value}")
++                android.util.Log.d("LuaCompose", "Animation frame: ${this.value}")
+                 if (composeState is androidx.compose.runtime.MutableState<Any?>) {
+                     val ms = composeState as androidx.compose.runtime.MutableState<Any?>
+                     ms.value = this.value

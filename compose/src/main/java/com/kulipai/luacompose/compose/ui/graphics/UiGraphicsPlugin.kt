@@ -4,6 +4,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.rotate
 import com.kulipai.luacompose.compose.runtime.ComposeBridge
 import com.kulipai.luacompose.compose.createComposeDrawScope
 import com.kulipai.luacompose.compose.runtime.ComposeScope
@@ -19,21 +23,7 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
     override fun getComponents(): Map<String, @Composable (props: Map<String, Any?>, childScope: ComposeScope?) -> Unit> {
         val map = mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: ComposeScope?) -> Unit>()
         
-        map["Canvas"] = { props, _ ->
-                    val modifier = resolveModifier(props["modifier"])
-                    val onDraw = props["onDraw"] as? ScriptFunction
-        
-                    Canvas(modifier = modifier) {
-                        if (onDraw != null) {
-                            val luaDrawScope = createComposeDrawScope(this)
-                            try {
-                                onDraw.call(luaDrawScope)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
-                        }
-                    }
-                }
+
         
         return map
     }
@@ -149,5 +139,118 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
                 transformOriginTable.setMetatable(transformOriginMeta)
                 scriptTable.set("TransformOrigin", transformOriginTable)
             
+                val strokeCapTable = ComposeBridge.engine.createTable()
+                strokeCapTable.set("Butt", ComposeBridge.engine.createUserdata(StrokeCap.Butt))
+                strokeCapTable.set("Round", ComposeBridge.engine.createUserdata(StrokeCap.Round))
+                strokeCapTable.set("Square", ComposeBridge.engine.createUserdata(StrokeCap.Square))
+                scriptTable.set("StrokeCap", strokeCapTable)
+
+                val strokeMeta = ComposeBridge.engine.createTable()
+                strokeMeta.set("__call", ComposeBridge.engine.createFunction { args ->
+                    val params = args.getOrNull(1)
+                    var width = 0.0f
+                    var cap = StrokeCap.Butt
+                    if (params != null && params.isTable()) {
+                        val pTable = params.asTable()
+                        val w = pTable.get("width")
+                        if (!w.isNil()) width = w.toFloat()
+                        val c = pTable.get("cap")
+                        if (!c.isNil()) cap = c.asUserdata() as StrokeCap
+                    }
+                    val table = ComposeBridge.engine.createTable()
+                    table.set("_javaStroke", ComposeBridge.engine.createUserdata(Stroke(width = width, cap = cap)))
+                    table
+                })
+                val strokeObj = ComposeBridge.engine.createTable()
+                strokeObj.setMetatable(strokeMeta)
+                val _G = com.kulipai.luacompose.compose.LuaComposeLib.globalEnv
+        if (_G != null) {
+            _G.set("StrokeCap", strokeCapTable)
+            _G.set("Stroke", strokeObj)
+        }
+        scriptTable.set("StrokeCap", strokeCapTable)
+        scriptTable.set("Stroke", strokeObj)
+
+        // ------------------- Global DrawScope utilities ---------------
+        val sizeGlobalMeta = ComposeBridge.engine.createTable()
+        sizeGlobalMeta.set("__index", ComposeBridge.engine.createFunction { args ->
+            val key = args[1].toStringValue()
+            val scope = ComposeBridge.getActiveDrawScope() ?: return@createFunction ComposeBridge.engine.createNil()
+            if (key == "width") return@createFunction ComposeBridge.engine.createValue(scope.size.width.toDouble())
+            if (key == "height") return@createFunction ComposeBridge.engine.createValue(scope.size.height.toDouble())
+            ComposeBridge.engine.createNil()
+        })
+        val sizeGlobal = ComposeBridge.engine.createTable()
+        sizeGlobal.setMetatable(sizeGlobalMeta)
+        scriptTable.set("size", sizeGlobal)
+
+        val rotateFunc = ComposeBridge.engine.createFunction { args ->
+            val scope = ComposeBridge.getActiveDrawScope() ?: return@createFunction ComposeBridge.engine.createNil()
+            val map = args[0].asTable()
+            val degreesVal = map.get("degrees")
+            val degrees = if (!degreesVal.isNil()) degreesVal.toFloat() else 0f
+            val pivotXVal = map.get("pivotX")
+            val pivotYVal = map.get("pivotY")
+            val pivotX = if (pivotXVal != null && !pivotXVal.isNil()) pivotXVal.toFloat() else scope.center.x
+            val pivotY = if (pivotYVal != null && !pivotYVal.isNil()) pivotYVal.toFloat() else scope.center.y
+            val block = map.get("block") as? ScriptFunction
+            if (block != null) {
+                scope.withTransform({
+                    rotate(degrees, androidx.compose.ui.geometry.Offset(pivotX, pivotY))
+                }) {
+                    block.call()
+                }
+            }
+            ComposeBridge.engine.createNil()
+        }
+        scriptTable.set("rotate", rotateFunc)
+
+        val drawArcFunc = ComposeBridge.engine.createFunction { args ->
+            val scope = ComposeBridge.getActiveDrawScope() ?: return@createFunction ComposeBridge.engine.createNil()
+            val map = args[0].asTable()
+            
+            val colorVal = map.get("color")
+            val color = if (colorVal != null && !colorVal.isNil()) {
+                val javaColor = ComposeBridge.unwrapAny(colorVal) as? Color
+                javaColor ?: Color.Black
+            } else Color.Black
+            
+            val startAngle = map.get("startAngle")?.let { if (!it.isNil()) it.toFloat() else 0f } ?: 0f
+            val sweepAngle = map.get("sweepAngle")?.let { if (!it.isNil()) it.toFloat() else 0f } ?: 0f
+            val useCenter = map.get("useCenter")?.let { if (!it.isNil()) it.toBoolean() else false } ?: false
+            
+            val topLeftVal = map.get("topLeft")
+            val topLeft = if (topLeftVal != null && !topLeftVal.isNil()) {
+                topLeftVal.asTable().get("_javaOffset").asUserdata() as androidx.compose.ui.geometry.Offset
+            } else androidx.compose.ui.geometry.Offset.Zero
+            
+            val sizeVal = map.get("size")
+            val size = if (sizeVal != null && !sizeVal.isNil()) {
+                sizeVal.asTable().get("_javaSize").asUserdata() as androidx.compose.ui.geometry.Size
+            } else androidx.compose.ui.geometry.Size(scope.size.width - topLeft.x, scope.size.height - topLeft.y)
+            
+            val styleVal = map.get("style")
+            val style = if (styleVal != null && !styleVal.isNil()) {
+                styleVal.asTable().get("_javaStroke").asUserdata() as androidx.compose.ui.graphics.drawscope.DrawStyle
+            } else androidx.compose.ui.graphics.drawscope.Fill
+            
+            scope.drawArc(
+                color = color,
+                startAngle = startAngle,
+                sweepAngle = sweepAngle,
+                useCenter = useCenter,
+                topLeft = topLeft,
+                size = size,
+                style = style
+            )
+            ComposeBridge.engine.createNil()
+        }
+        
+        scriptTable.set("drawArc", drawArcFunc)
+        if (_G != null) {
+            _G.set("size", sizeGlobal)
+            _G.set("rotate", rotateFunc)
+            _G.set("drawArc", drawArcFunc)
+        }
     }
 }

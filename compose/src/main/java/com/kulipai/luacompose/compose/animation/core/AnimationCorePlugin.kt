@@ -172,5 +172,24 @@ class AnimationCorePlugin : ComposeScriptPlugin {
         repeatModeTable.set("Restart", ComposeBridge.javaToScript(RepeatMode.Restart))
         repeatModeTable.set("Reverse", ComposeBridge.javaToScript(RepeatMode.Reverse))
         scriptTable.set("RepeatMode", repeatModeTable)
+
+
+        // ------------------ Spring ------------------
+        val springTable = ComposeBridge.engine.createTable()
+        springTable.set("StiffnessHigh", ComposeBridge.javaToScript(Spring.StiffnessHigh))
+        springTable.set("StiffnessMedium", ComposeBridge.javaToScript(Spring.StiffnessMedium))
+        springTable.set("StiffnessMediumLow", ComposeBridge.javaToScript(Spring.StiffnessMediumLow))
+        springTable.set("StiffnessLow", ComposeBridge.javaToScript(Spring.StiffnessLow))
+        springTable.set("StiffnessVeryLow", ComposeBridge.javaToScript(Spring.StiffnessVeryLow))
+        springTable.set("DampingRatioHighBouncy", ComposeBridge.javaToScript(Spring.DampingRatioHighBouncy))
+        springTable.set("DampingRatioMediumBouncy", ComposeBridge.javaToScript(Spring.DampingRatioMediumBouncy))
+        springTable.set("DampingRatioLowBouncy", ComposeBridge.javaToScript(Spring.DampingRatioLowBouncy))
+        springTable.set("DampingRatioNoBouncy", ComposeBridge.javaToScript(Spring.DampingRatioNoBouncy))
+        springTable.set("DefaultDisplacementThreshold", ComposeBridge.javaToScript(Spring.DefaultDisplacementThreshold))
+
+
+        scriptTable.set("Spring",springTable)
+
+
     }
 }

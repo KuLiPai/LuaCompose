@@ -3,18 +3,14 @@ package com.kulipai.luacompose.compose.animation
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.graphics.Color
 import com.kulipai.luacompose.compose.runtime.ComposeAnimatableState
 import com.kulipai.luacompose.compose.runtime.ComposeBridge
 import com.kulipai.luacompose.compose.runtime.ComposeScope
-import com.kulipai.luacompose.compose.ui.graphics.ComposeScopeComponent
 import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
 import com.kulipai.luacompose.compose.ui.resolveColor
 import com.kulipai.luacompose.compose.ui.resolveDp
-import com.kulipai.luacompose.compose.ui.resolveModifier
 import com.kulipai.luacompose.compose.script.ScriptFunction
 import com.kulipai.luacompose.compose.script.ScriptTable
 import com.kulipai.luacompose.compose.script.ScriptValue
@@ -52,67 +48,11 @@ class AnimationPlugin : ComposeScriptPlugin {
         return defaultSpec
     }
 
-    override fun injectGlobals(luaTable: ScriptTable) {
-        luaTable.set("tween", ComposeBridge.engine.createFunction { args -> 
-            var duration = 300
-            var delay = 0
-            var easingStr = "FastOutSlowIn"
-
-            val arg1 = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
-            if (arg1.isTable()) {
-                val t = arg1.asTable()
-                val dur = t.get("durationMillis")
-                val dur2 = t.get("duration")
-                duration = if (!dur.isNil()) dur.toInt() else if (!dur2.isNil()) dur2.toInt() else 300
-                val del = t.get("delayMillis")
-                val del2 = t.get("delay")
-                delay = if (!del.isNil()) del.toInt() else if (!del2.isNil()) del2.toInt() else 0
-                val eas = t.get("easing")
-                easingStr = if (!eas.isNil()) eas.toStringValue() else "FastOutSlowIn"
-            } else {
-                val dur = args.getOrNull(0)
-                val del = args.getOrNull(1)
-                val eas = args.getOrNull(2)
-                duration = if (dur != null && !dur.isNil()) dur.toInt() else 300
-                delay = if (del != null && !del.isNil()) del.toInt() else 0
-                easingStr = if (eas != null && !eas.isNil()) eas.toStringValue() else "FastOutSlowIn"
-            }
-
-            val table = ComposeBridge.engine.createTable()
-            table.set("type", ComposeBridge.engine.createValue("tween"))
-            table.set("duration", ComposeBridge.engine.createValue(duration))
-            table.set("delay", ComposeBridge.engine.createValue(delay))
-            table.set("easing", ComposeBridge.engine.createValue(easingStr))
-            table
-        })
-
-        luaTable.set("spring", ComposeBridge.engine.createFunction { args -> 
-            var damping = Spring.DampingRatioNoBouncy.toFloat()
-            var stiffness = Spring.StiffnessMedium.toFloat()
-
-            val arg1 = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
-            if (arg1.isTable()) {
-                val t = arg1.asTable()
-                val damp = t.get("dampingRatio")
-                val stiff = t.get("stiffness")
-                if (!damp.isNil()) damping = damp.toFloat()
-                if (!stiff.isNil()) stiffness = stiff.toFloat()
-            } else {
-                val damp = args.getOrNull(0)
-                val stiff = args.getOrNull(1)
-                if (damp != null && !damp.isNil()) damping = damp.toFloat()
-                if (stiff != null && !stiff.isNil()) stiffness = stiff.toFloat()
-            }
-
-            val table = ComposeBridge.engine.createTable()
-            table.set("type", ComposeBridge.engine.createValue("spring"))
-            table.set("dampingRatio", ComposeBridge.engine.createValue(damping.toDouble()))
-            table.set("stiffness", ComposeBridge.engine.createValue(stiffness.toDouble()))
-            table
-        })
+    override fun injectGlobals(scriptTable: ScriptTable) {
+        // Transitions
 
         // Transitions
-        luaTable.set("fadeIn", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("fadeIn", ComposeBridge.engine.createFunction { args ->
             var specValue: ScriptValue? = null
             var initialAlpha = 0f
             val arg1 = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
@@ -134,7 +74,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             res
         })
         
-        luaTable.set("fadeOut", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("fadeOut", ComposeBridge.engine.createFunction { args ->
             var specValue: ScriptValue? = null
             var targetAlpha = 0f
             val arg1 = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
@@ -154,7 +94,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             createExitTransition(fadeOut(animationSpec = spec, targetAlpha = targetAlpha))
         })
         
-        luaTable.set("expandIn", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("expandIn", ComposeBridge.engine.createFunction { args ->
             var specValue: ScriptValue? = null
             val arg1 = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
             if (arg1.isTable() && !arg1.asTable().get("animationSpec").isNil()) {
@@ -166,7 +106,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             createEnterTransition(expandIn(animationSpec = spec))
         })
         
-        luaTable.set("shrinkOut", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("shrinkOut", ComposeBridge.engine.createFunction { args ->
             var specValue: ScriptValue? = null
             val arg1 = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
             if (arg1.isTable() && !arg1.asTable().get("animationSpec").isNil()) {
@@ -178,7 +118,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             createExitTransition(shrinkOut(animationSpec = spec))
         })
         
-        luaTable.set("slideInHorizontally", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("slideInHorizontally", ComposeBridge.engine.createFunction { args ->
             var specValue: ScriptValue? = null
             var initialOffsetX: ScriptFunction? = null
             val arg1 = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
@@ -206,7 +146,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             res
         })
         
-        luaTable.set("slideOutHorizontally", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("slideOutHorizontally", ComposeBridge.engine.createFunction { args ->
             var specValue: ScriptValue? = null
             var targetOffsetX: ScriptFunction? = null
             val arg1 = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
@@ -232,7 +172,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             createExitTransition(slideOutHorizontally(animationSpec = spec, targetOffsetX = offsetFunc))
         })
         
-        luaTable.set("slideInVertically", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("slideInVertically", ComposeBridge.engine.createFunction { args ->
             var specValue: ScriptValue? = null
             var initialOffsetY: ScriptFunction? = null
             val arg1 = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
@@ -258,7 +198,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             createEnterTransition(slideInVertically(animationSpec = spec, initialOffsetY = offsetFunc))
         })
         
-        luaTable.set("slideOutVertically", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("slideOutVertically", ComposeBridge.engine.createFunction { args ->
             var specValue: ScriptValue? = null
             var targetOffsetY: ScriptFunction? = null
             val arg1 = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
@@ -284,7 +224,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             createExitTransition(slideOutVertically(animationSpec = spec, targetOffsetY = offsetFunc))
         })
 
-        luaTable.set("scaleIn", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("scaleIn", ComposeBridge.engine.createFunction { args ->
             var specValue: ScriptValue? = null
             var initialScale = 0f
             var transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
@@ -316,7 +256,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             createEnterTransition(scaleIn(animationSpec = spec, initialScale = initialScale, transformOrigin = transformOrigin))
         })
         
-        luaTable.set("scaleOut", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("scaleOut", ComposeBridge.engine.createFunction { args ->
             var specValue: ScriptValue? = null
             var targetScale = 0f
             var transformOrigin = androidx.compose.ui.graphics.TransformOrigin.Center
@@ -349,7 +289,7 @@ class AnimationPlugin : ComposeScriptPlugin {
         })
 
         // AsState animators
-        luaTable.set("animateFloatAsState", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("animateFloatAsState", ComposeBridge.engine.createFunction { args ->
             val (targetValue, spec) = resolveAnimationArgs(args)
             val target = targetValue.toFloat()
             val activeScope = ComposeBridge.getActiveScope()
@@ -369,7 +309,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             ComposeBridge.engine.createNil()
         })
 
-        luaTable.set("animateIntAsState", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("animateIntAsState", ComposeBridge.engine.createFunction { args ->
             val (targetValue, spec) = resolveAnimationArgs(args)
             val target = targetValue.toInt()
             val activeScope = ComposeBridge.getActiveScope()
@@ -389,7 +329,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             ComposeBridge.engine.createNil()
         })
 
-        luaTable.set("animateDpAsState", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("animateDpAsState", ComposeBridge.engine.createFunction { args ->
             val (targetValue, spec) = resolveAnimationArgs(args)
             val target = resolveDp(ComposeBridge.scriptToJava(targetValue))
             val activeScope = ComposeBridge.getActiveScope()
@@ -410,7 +350,7 @@ class AnimationPlugin : ComposeScriptPlugin {
         })
 
         
-        luaTable.set("togetherWith", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("togetherWith", ComposeBridge.engine.createFunction { args ->
             val arg1 = args[0]
             val arg2 = args[1]
             var enter: androidx.compose.animation.EnterTransition = androidx.compose.animation.fadeIn()
@@ -431,7 +371,7 @@ class AnimationPlugin : ComposeScriptPlugin {
             createContentTransform(enter.togetherWith(exit))
         })
 
-        luaTable.set("animateColorAsState", ComposeBridge.engine.createFunction { args -> 
+        scriptTable.set("animateColorAsState", ComposeBridge.engine.createFunction { args ->
             val (targetValue, spec) = resolveAnimationArgs(args)
             val target = resolveColor(ComposeBridge.scriptToJava(targetValue))
             val activeScope = ComposeBridge.getActiveScope()
@@ -453,21 +393,5 @@ class AnimationPlugin : ComposeScriptPlugin {
 
 
         // ------------------ Spring ------------------
-        val springTable = ComposeBridge.engine.createTable()
-        springTable.set("StiffnessHigh", ComposeBridge.javaToScript(Spring.StiffnessHigh))
-        springTable.set("StiffnessMedium", ComposeBridge.javaToScript(Spring.StiffnessMedium))
-        springTable.set("StiffnessMediumLow", ComposeBridge.javaToScript(Spring.StiffnessMediumLow))
-        springTable.set("StiffnessLow", ComposeBridge.javaToScript(Spring.StiffnessLow))
-        springTable.set("StiffnessVeryLow", ComposeBridge.javaToScript(Spring.StiffnessVeryLow))
-        springTable.set("DampingRatioHighBouncy", ComposeBridge.javaToScript(Spring.DampingRatioHighBouncy))
-        springTable.set("DampingRatioMediumBouncy", ComposeBridge.javaToScript(Spring.DampingRatioMediumBouncy))
-        springTable.set("DampingRatioLowBouncy", ComposeBridge.javaToScript(Spring.DampingRatioLowBouncy))
-        springTable.set("DampingRatioNoBouncy", ComposeBridge.javaToScript(Spring.DampingRatioNoBouncy))
-        springTable.set("DefaultDisplacementThreshold", ComposeBridge.javaToScript(Spring.DefaultDisplacementThreshold))
-
-
-        luaTable.set("Spring",springTable)
     }
 }
-
-

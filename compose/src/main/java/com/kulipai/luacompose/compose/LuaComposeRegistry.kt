@@ -150,6 +150,7 @@ object LuaComposeRegistry {
         registerPlugin(com.kulipai.luacompose.compose.ui.graphics.UiGraphicsPlugin())
         registerPlugin(Material3Plugin())
         registerPlugin(AnimationPlugin())
+        registerPlugin(com.kulipai.luacompose.compose.animation.core.AnimationCorePlugin())
     }
 
     fun registerPlugin(plugin: ComposeScriptPlugin) {

@@ -100,6 +100,7 @@ object ComposeBridge {
                 val isDp = table.get("_javaDp")
                 val isSize = table.get("_javaSize")
                 val isOffset = table.get("_javaOffset")
+                val isIntOffset = table.get("_javaIntOffset")
                 val isStroke = table.get("_javaStroke")
 
                 if (isState.isBoolean() && isState.toBoolean()) {
@@ -112,6 +113,8 @@ object ComposeBridge {
                     isSize.asUserdata()
                 } else if (isOffset.isUserdata()) {
                     isOffset.asUserdata()
+                } else if (isIntOffset.isUserdata()) {
+                    isIntOffset.asUserdata()
                 } else if (isStroke.isUserdata()) {
                     isStroke.asUserdata()
                 } else {

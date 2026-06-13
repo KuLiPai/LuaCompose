@@ -153,6 +153,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             modifier = modifier.offset {
                 val res = table.call()
                 val unwrapped = ComposeBridge.unwrapAny(res)
+                
                 if (unwrapped is androidx.compose.ui.unit.IntOffset) {
                     unwrapped
                 } else {

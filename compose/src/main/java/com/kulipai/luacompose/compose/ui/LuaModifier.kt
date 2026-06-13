@@ -94,53 +94,6 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         modifier = modifier.height(resolveDp(height)); return this
     }
 
-    fun heightIn(table: Any): LuaModifier {
-        val unwrapped = ComposeBridge.unwrapAny(table)
-        if (unwrapped is Map<*, *>) {
-            val min = unwrapped["min"]
-            val max = unwrapped["max"]
-            val minDp = if (min != null) resolveDp(min) else androidx.compose.ui.unit.Dp.Unspecified
-            val maxDp = if (max != null) resolveDp(max) else androidx.compose.ui.unit.Dp.Unspecified
-            modifier = modifier.heightIn(minDp, maxDp)
-        } else {
-            modifier = modifier.heightIn(min = resolveDp(unwrapped))
-        }
-        return this
-    }
-
-    fun widthIn(table: Any): LuaModifier {
-        val unwrapped = ComposeBridge.unwrapAny(table)
-        if (unwrapped is Map<*, *>) {
-            val min = unwrapped["min"]
-            val max = unwrapped["max"]
-            val minDp = if (min != null) resolveDp(min) else androidx.compose.ui.unit.Dp.Unspecified
-            val maxDp = if (max != null) resolveDp(max) else androidx.compose.ui.unit.Dp.Unspecified
-            modifier = modifier.widthIn(minDp, maxDp)
-        } else {
-            modifier = modifier.widthIn(min = resolveDp(unwrapped))
-        }
-        return this
-    }
-
-    fun sizeIn(table: Any): LuaModifier {
-        val unwrapped = ComposeBridge.unwrapAny(table)
-        if (unwrapped is Map<*, *>) {
-            val minWidth = unwrapped["minWidth"] ?: unwrapped["min"]
-            val maxWidth = unwrapped["maxWidth"] ?: unwrapped["max"]
-            val minHeight = unwrapped["minHeight"] ?: unwrapped["min"]
-            val maxHeight = unwrapped["maxHeight"] ?: unwrapped["max"]
-            
-            val minW = if (minWidth != null) resolveDp(minWidth) else androidx.compose.ui.unit.Dp.Unspecified
-            val maxW = if (maxWidth != null) resolveDp(maxWidth) else androidx.compose.ui.unit.Dp.Unspecified
-            val minH = if (minHeight != null) resolveDp(minHeight) else androidx.compose.ui.unit.Dp.Unspecified
-            val maxH = if (maxHeight != null) resolveDp(maxHeight) else androidx.compose.ui.unit.Dp.Unspecified
-            modifier = modifier.sizeIn(minW, minH, maxW, maxH)
-        } else {
-            modifier = modifier.sizeIn(minWidth = resolveDp(unwrapped), minHeight = resolveDp(unwrapped))
-        }
-        return this
-    }
-
     fun wrapContentSize(): LuaModifier {
         modifier = modifier.wrapContentSize(); return this
     }
@@ -486,16 +439,17 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return this
     }
 
-    fun widthIn(table: ScriptTable?): LuaModifier {
-        val min = anyFromScript(table?.get("min")) ?: anyFromScript(table?.get(1))
-        val max = anyFromScript(table?.get("max")) ?: anyFromScript(table?.get(2))
-
-        // 如果为 null，就传入 Dp.Unspecified
-        val minDp = min?.let { resolveDp(it) } ?: Dp.Unspecified
-        val maxDp = max?.let { resolveDp(it) } ?: Dp.Unspecified
-
-        modifier = modifier.widthIn(min = minDp, max = maxDp)
-
+    fun widthIn(table: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(table)
+        if (unwrapped is Map<*, *>) {
+            val min = unwrapped["min"] ?: unwrapped[1.0] ?: unwrapped[1]
+            val max = unwrapped["max"] ?: unwrapped[2.0] ?: unwrapped[2]
+            val minDp = if (min != null) resolveDp(min) else Dp.Unspecified
+            val maxDp = if (max != null) resolveDp(max) else Dp.Unspecified
+            modifier = modifier.widthIn(min = minDp, max = maxDp)
+        } else {
+            modifier = modifier.widthIn(min = resolveDp(unwrapped))
+        }
         return this
     }
 
@@ -510,16 +464,17 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return this
     }
 
-    fun heightIn(table: ScriptTable?): LuaModifier {
-        val min = anyFromScript(table?.get("min")) ?: anyFromScript(table?.get(1))
-        val max = anyFromScript(table?.get("max")) ?: anyFromScript(table?.get(2))
-
-        // 如果为 null，就传入 Dp.Unspecified
-        val minDp = min?.let { resolveDp(it) } ?: Dp.Unspecified
-        val maxDp = max?.let { resolveDp(it) } ?: Dp.Unspecified
-
-        modifier = modifier.heightIn(min = minDp, max = maxDp)
-
+    fun heightIn(table: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(table)
+        if (unwrapped is Map<*, *>) {
+            val min = unwrapped["min"] ?: unwrapped[1.0] ?: unwrapped[1]
+            val max = unwrapped["max"] ?: unwrapped[2.0] ?: unwrapped[2]
+            val minDp = if (min != null) resolveDp(min) else Dp.Unspecified
+            val maxDp = if (max != null) resolveDp(max) else Dp.Unspecified
+            modifier = modifier.heightIn(min = minDp, max = maxDp)
+        } else {
+            modifier = modifier.heightIn(min = resolveDp(unwrapped))
+        }
         return this
     }
 
@@ -544,25 +499,28 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return this
     }
 
-    fun sizeIn(table: ScriptTable?): LuaModifier {
-        val minWidth = anyFromScript(table?.get("minWidth")) ?: anyFromScript(table?.get(1))
-        val minHeight = anyFromScript(table?.get("minHeight")) ?: anyFromScript(table?.get(2))
-        val maxWidth = anyFromScript(table?.get("maxWidth")) ?: anyFromScript(table?.get(3))
-        val maxHeight = anyFromScript(table?.get("maxHeight")) ?: anyFromScript(table?.get(4))
+    fun sizeIn(table: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(table)
+        if (unwrapped is Map<*, *>) {
+            val minWidth = unwrapped["minWidth"] ?: unwrapped["min"] ?: unwrapped[1.0] ?: unwrapped[1]
+            val minHeight = unwrapped["minHeight"] ?: unwrapped["min"] ?: unwrapped[2.0] ?: unwrapped[2]
+            val maxWidth = unwrapped["maxWidth"] ?: unwrapped["max"] ?: unwrapped[3.0] ?: unwrapped[3]
+            val maxHeight = unwrapped["maxHeight"] ?: unwrapped["max"] ?: unwrapped[4.0] ?: unwrapped[4]
 
-        // 如果为 null，就传入 Dp.Unspecified
-        val minWidthDp = minWidth?.let { resolveDp(it) } ?: Dp.Unspecified
-        val minHeightDp = minHeight?.let { resolveDp(it) } ?: Dp.Unspecified
-        val maxWidthDp = maxWidth?.let { resolveDp(it) } ?: Dp.Unspecified
-        val maxHeightDp = maxHeight?.let { resolveDp(it) } ?: Dp.Unspecified
+            val minWidthDp = if (minWidth != null) resolveDp(minWidth) else Dp.Unspecified
+            val minHeightDp = if (minHeight != null) resolveDp(minHeight) else Dp.Unspecified
+            val maxWidthDp = if (maxWidth != null) resolveDp(maxWidth) else Dp.Unspecified
+            val maxHeightDp = if (maxHeight != null) resolveDp(maxHeight) else Dp.Unspecified
 
-        modifier = modifier.sizeIn(
-            minWidth = minWidthDp,
-            minHeight = minHeightDp,
-            maxWidth = maxWidthDp,
-            maxHeight = maxHeightDp
-        )
-
+            modifier = modifier.sizeIn(
+                minWidth = minWidthDp,
+                minHeight = minHeightDp,
+                maxWidth = maxWidthDp,
+                maxHeight = maxHeightDp
+            )
+        } else {
+            modifier = modifier.sizeIn(minWidth = resolveDp(unwrapped), minHeight = resolveDp(unwrapped))
+        }
         return this
     }
 

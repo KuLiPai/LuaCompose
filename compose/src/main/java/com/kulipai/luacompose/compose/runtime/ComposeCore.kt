@@ -69,6 +69,14 @@ object ComposeBridge {
         if (stack.isNotEmpty()) stack.pop()
     }
 
+    private val activePointerInputScopeActions = ThreadLocal.withInitial { java.util.Stack<MutableList<suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit>>() }
+    fun getActivePointerInputScopeActions(): MutableList<suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit>? = if (activePointerInputScopeActions.get()!!.isNotEmpty()) activePointerInputScopeActions.get()!!.peek() else null
+    fun pushActivePointerInputScopeActions(actions: MutableList<suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit>) { activePointerInputScopeActions.get()!!.push(actions) }
+    fun popActivePointerInputScopeActions() {
+        val stack = activePointerInputScopeActions.get()!!
+        if (stack.isNotEmpty()) stack.pop()
+    }
+
     fun scriptToJava(value: ScriptValue?): Any? {
         if (value == null || value.isNil()) return null
         return when {
@@ -89,11 +97,23 @@ object ComposeBridge {
                 val table = value.asTable()
                 val isState = table.get("_isState")
                 val isColor = table.get("_javaColor")
+                val isDp = table.get("_javaDp")
+                val isSize = table.get("_javaSize")
+                val isOffset = table.get("_javaOffset")
+                val isStroke = table.get("_javaStroke")
+
                 if (isState.isBoolean() && isState.toBoolean()) {
                     table.get("javaState").asUserdata()
                 } else if (isColor.isUserdata()) {
-                    android.util.Log.d("LUA_ANIM", "scriptToJava UNWRAPPING Color: ${isColor.asUserdata()}")
                     isColor.asUserdata()
+                } else if (isDp.isUserdata()) {
+                    isDp.asUserdata()
+                } else if (isSize.isUserdata()) {
+                    isSize.asUserdata()
+                } else if (isOffset.isUserdata()) {
+                    isOffset.asUserdata()
+                } else if (isStroke.isUserdata()) {
+                    isStroke.asUserdata()
                 } else {
                     val len = table.length()
                     if (len > 0) {
@@ -125,6 +145,10 @@ object ComposeBridge {
     var luaValueUnwrapper: ((Any?) -> Any?)? = null
 
     fun unwrapAny(value: Any?): Any? {
+        if (value is ScriptValue) {
+            val unwrapped = scriptToJava(value)
+            if (unwrapped != null && unwrapped !is ScriptValue) return unwrapped
+        }
         return luaValueUnwrapper?.invoke(value) ?: value
     }
 
@@ -221,12 +245,16 @@ class ComposeScope(var contentFunc: ScriptFunction) {
         return states[actualKey]!!
     }
 
-    fun getOrCreateRemember(initFunc: ScriptFunction): ScriptValue {
+    internal val rememberKeys = mutableMapOf<Any, List<Any?>>()
+
+    fun getOrCreateRemember(initFunc: ScriptFunction, keys: List<Any?> = emptyList()): ScriptValue {
         val actualKey = remembersCount++
         accessedRemembers.add(actualKey)
-        if (!remembers.containsKey(actualKey)) {
+        val oldKeys = rememberKeys[actualKey]
+        if (!remembers.containsKey(actualKey) || oldKeys != keys) {
             val initialValue = initFunc.call()
             remembers[actualKey] = initialValue
+            rememberKeys[actualKey] = keys
         }
         return remembers[actualKey] as ScriptValue
     }
@@ -249,6 +277,13 @@ class ComposeScope(var contentFunc: ScriptFunction) {
         accessedChildScopes.add(actualKey)
         val scope = childScopes.getOrPut(actualKey) { ComposeScope(func) }
         scope.contentFunc = func
+        scope.coroutineScope = this.coroutineScope
+        scope.context = this.context
+        scope.density = this.density
+        scope.configuration = this.configuration
+        scope.colorScheme = this.colorScheme
+        scope.typography = this.typography
+        scope.shapes = this.shapes
         return scope
     }
 
@@ -287,6 +322,7 @@ class ComposeScope(var contentFunc: ScriptFunction) {
         
         states.keys.retainAll(accessedStates)
         remembers.keys.retainAll(accessedRemembers)
+        rememberKeys.keys.retainAll(accessedRemembers)
         childScopes.keys.retainAll(accessedChildScopes)
 
         return rootNodes

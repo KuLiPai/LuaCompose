@@ -40,11 +40,5 @@ class UiGeometryPlugin : ComposeScriptPlugin {
         val offsetTable = ComposeBridge.engine.createTable()
         offsetTable.setMetatable(offsetMeta)
         scriptTable.set("Offset", offsetTable)
-        
-        val _G = com.kulipai.luacompose.compose.LuaComposeLib.globalEnv
-        if (_G != null) {
-            _G.set("Size", sizeTable)
-            _G.set("Offset", offsetTable)
-        }
     }
 }

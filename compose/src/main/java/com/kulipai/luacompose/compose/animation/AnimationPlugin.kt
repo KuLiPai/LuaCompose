@@ -392,6 +392,5 @@ class AnimationPlugin : ComposeScriptPlugin {
         })
 
 
-        // ------------------ Spring ------------------
     }
 }

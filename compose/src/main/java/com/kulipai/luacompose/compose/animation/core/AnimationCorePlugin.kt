@@ -10,6 +10,7 @@ import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
 import com.kulipai.luacompose.compose.script.ScriptFunction
 import com.kulipai.luacompose.compose.script.ScriptTable
 import com.kulipai.luacompose.compose.script.ScriptValue
+import kotlinx.coroutines.launch
 
 class AnimationCorePlugin : ComposeScriptPlugin {
     override val namespace: String = "animation.core"
@@ -20,6 +21,70 @@ class AnimationCorePlugin : ComposeScriptPlugin {
 
     override fun injectGlobals(scriptTable: ScriptTable) {
         val engine = ComposeBridge.engine
+
+        scriptTable.set("Animatable", engine.createFunction { args ->
+            val initialValue = args[0].toFloat()
+            val state = com.kulipai.luacompose.compose.runtime.ComposeAnimatableState(
+                initialValue, kotlin.Float.VectorConverter, com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()!!
+            )
+            
+            val table = engine.createTable()
+            
+            val meta = engine.createTable()
+            meta.set("__index", engine.createFunction { idxArgs ->
+                val key = idxArgs[1].toStringValue()
+                if (key == "value") {
+                    val activeScope = com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()
+                    if (activeScope != null) {
+                        state.registerDependency(activeScope)
+                    }
+                    return@createFunction com.kulipai.luacompose.compose.runtime.ComposeBridge.javaToScript(state.get())
+                }
+                if (key == "snapTo") {
+                    return@createFunction engine.createFunction { snapArgs ->
+                        val target = snapArgs.getOrNull(1)?.toFloat() ?: 0f
+                        state.scope.coroutineScope?.launch {
+                            state.animatable.snapTo(target)
+                            val ms = state.composeState as? androidx.compose.runtime.MutableState<Any?>
+                            if (ms != null) ms.value = target
+                            state.registerDependency(state.scope)
+                            state.scope.invalidate() // Optional, dependentScopes usually handles it, but maybe safer
+                        }
+                        engine.createNil()
+                    }
+                }
+                if (key == "animateTo") {
+                    return@createFunction engine.createFunction { animArgs ->
+                        val tableArg = animArgs.getOrNull(1)
+                        var target = 0f
+                        var spec: AnimationSpec<Float>? = null
+                        if (tableArg != null && tableArg.isTable()) {
+                            val t = tableArg.asTable()
+                            target = t.get("targetValue").toFloat()
+                            val s = t.get("animationSpec")
+                            if (!s.isNil()) spec = parseAnimationSpec<Float>(s.asTable()) as AnimationSpec<Float>
+                        } else {
+                            target = animArgs.getOrNull(1)?.toFloat() ?: 0f
+                        }
+                        state.scope.coroutineScope?.launch {
+                            val block: Animatable<Float, AnimationVector1D>.() -> Unit = {
+                                val ms = state.composeState as? androidx.compose.runtime.MutableState<Any?>
+                                if (ms != null) ms.value = this.value
+                            }
+                            if (spec != null) {
+                                state.animatable.animateTo(target, spec, block = block)
+                            } else {
+                                state.animatable.animateTo(target, block = block)
+                            }
+                        }
+                        engine.createNil()
+                    }
+                }
+                engine.createNil()
+            })
+            table.setMetatable(meta)
+            table
+        })
 
         scriptTable.set("tween", engine.createFunction { args ->
             var duration = 300
@@ -189,6 +254,8 @@ class AnimationCorePlugin : ComposeScriptPlugin {
 
 
         scriptTable.set("Spring",springTable)
+
+
 
 
     }

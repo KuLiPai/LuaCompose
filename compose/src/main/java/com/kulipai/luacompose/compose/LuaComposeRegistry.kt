@@ -7,6 +7,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.withTransform
 import com.kulipai.luacompose.compose.animation.AnimationPlugin
 import com.kulipai.luacompose.compose.foundation.FoundationPlugin
 import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
@@ -137,6 +139,72 @@ fun createComposeDrawScope(drawScope: DrawScope): ScriptTable {
         ComposeBridge.engine.createNil()
     })
     
+    table.set("rotate", ComposeBridge.engine.createFunction { args ->
+        val map = args[0].asTable()
+        val degreesVal = map.get("degrees")
+        val degrees = if (!degreesVal.isNil()) degreesVal.toFloat() else 0f
+        val pivotXVal = map.get("pivotX")
+        val pivotYVal = map.get("pivotY")
+        val pivotX = if (pivotXVal != null && !pivotXVal.isNil()) pivotXVal.toFloat() else drawScope.center.x
+        val pivotY = if (pivotYVal != null && !pivotYVal.isNil()) pivotYVal.toFloat() else drawScope.center.y
+        val block = map.get("block") as? com.kulipai.luacompose.compose.script.ScriptFunction
+        if (block != null) {
+            drawScope.withTransform({
+                rotate(degrees, Offset(pivotX, pivotY))
+            }) {
+                block.call()
+            }
+        }
+        ComposeBridge.engine.createNil()
+    })
+
+    table.set("drawArc", ComposeBridge.engine.createFunction { args ->
+        val map = args[0].asTable()
+        val colorVal = map.get("color")
+        val color = com.kulipai.luacompose.compose.ui.resolveColor(ComposeBridge.scriptToJava(colorVal), androidx.compose.ui.graphics.Color.Black)
+        
+        val startAngle = map.get("startAngle")?.let { if (!it.isNil()) it.toFloat() else 0f } ?: 0f
+        val sweepAngle = map.get("sweepAngle")?.let { if (!it.isNil()) it.toFloat() else 0f } ?: 0f
+        val useCenter = map.get("useCenter")?.let { if (!it.isNil()) it.toBoolean() else false } ?: false
+        
+        val topLeftVal = map.get("topLeft")
+        val topLeft = if (topLeftVal != null && !topLeftVal.isNil()) {
+            topLeftVal.asTable().get("_javaOffset").asUserdata() as Offset
+        } else Offset.Zero
+        
+        val sizeVal = map.get("size")
+        val size = if (sizeVal != null && !sizeVal.isNil()) {
+            sizeVal.asTable().get("_javaSize").asUserdata() as Size
+        } else Size(drawScope.size.width - topLeft.x, drawScope.size.height - topLeft.y)
+        
+        val styleVal = map.get("style")
+        val style = if (styleVal != null && !styleVal.isNil()) {
+            styleVal.asTable().get("_javaStroke").asUserdata() as androidx.compose.ui.graphics.drawscope.DrawStyle
+        } else androidx.compose.ui.graphics.drawscope.Fill
+        
+        drawScope.drawArc(
+            color = color,
+            startAngle = startAngle,
+            sweepAngle = sweepAngle,
+            useCenter = useCenter,
+            topLeft = topLeft,
+            size = size,
+            style = style
+        )
+        ComposeBridge.engine.createNil()
+    })
+
+    val sizeMeta = ComposeBridge.engine.createTable()
+    sizeMeta.set("__index", ComposeBridge.engine.createFunction { args ->
+        val key = args[1].toStringValue()
+        if (key == "width") return@createFunction ComposeBridge.engine.createValue(drawScope.size.width.toDouble())
+        if (key == "height") return@createFunction ComposeBridge.engine.createValue(drawScope.size.height.toDouble())
+        ComposeBridge.engine.createNil()
+    })
+    val sizeTable = ComposeBridge.engine.createTable()
+    sizeTable.setMetatable(sizeMeta)
+    table.set("size", sizeTable)
+
     return table
 }
 
@@ -152,6 +220,7 @@ object LuaComposeRegistry {
         registerPlugin(AnimationPlugin())
         registerPlugin(com.kulipai.luacompose.compose.animation.core.AnimationCorePlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.geometry.UiGeometryPlugin())
+        registerPlugin(com.kulipai.luacompose.compose.ui.unit.UiUnitPlugin())
     }
 
     fun registerPlugin(plugin: ComposeScriptPlugin) {

@@ -34,6 +34,8 @@ import com.kulipai.luacompose.compose.runtime.ComposeBridge
 import com.kulipai.luacompose.compose.script.ScriptFunction
 import com.kulipai.luacompose.compose.script.ScriptTable
 import com.kulipai.luacompose.compose.script.ScriptValue
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 // --- 3. 极其优雅的链式 Modifier 封装 ---
 class LuaModifier(var modifier: Modifier = Modifier) {
@@ -144,8 +146,22 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         modifier = modifier.offset(resolveDp(x), resolveDp(y)); return this
     }
 
-    fun offset(table: Any): LuaModifier {
-        val unwrapped = ComposeBridge.unwrapAny(table)
+    fun offset(tableRaw: Any): LuaModifier {
+        val tableValue = if (tableRaw is ScriptValue) tableRaw else ComposeBridge.engine.coerceJavaToScript(tableRaw)
+        if (tableValue.isFunction()) {
+            val table = tableValue.asFunction()
+            modifier = modifier.offset {
+                val res = table.call()
+                val unwrapped = ComposeBridge.unwrapAny(res)
+                if (unwrapped is androidx.compose.ui.unit.IntOffset) {
+                    unwrapped
+                } else {
+                    androidx.compose.ui.unit.IntOffset.Zero
+                }
+            }
+            return this
+        }
+        val unwrapped = ComposeBridge.unwrapAny(tableRaw)
         if (unwrapped is Map<*, *>) {
             val x = unwrapped["x"] ?: unwrapped[1.0] ?: unwrapped[1]
             val y = unwrapped["y"] ?: unwrapped[2.0] ?: unwrapped[2]
@@ -234,6 +250,41 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         }
         if (clipShape != null) {
             modifier = modifier.clip(clipShape)
+        }
+        return this
+    }
+
+    fun pointerInput(vararg args: Any): LuaModifier {
+        if (args.isEmpty()) return this
+        val keys = args.dropLast(1).map { ComposeBridge.unwrapAny(it) }.toTypedArray()
+        val blockValueRaw = args.last()
+        val blockValue = if (blockValueRaw is ScriptValue) blockValueRaw else ComposeBridge.engine.coerceJavaToScript(blockValueRaw)
+        val block = if (blockValue.isFunction()) blockValue.asFunction() else null
+        
+        if (block != null) {
+            val lambda: suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit = {
+                android.util.Log.e("LUAMODIFIER_LOG", "POINTER INPUT LAMBDA EXECUTING!!")
+                val actions = mutableListOf<suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit>()
+                ComposeBridge.pushActivePointerInputScopeActions(actions)
+                try {
+                    block.call()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    ComposeBridge.popActivePointerInputScopeActions()
+                }
+                kotlinx.coroutines.coroutineScope {
+                    for (action in actions) {
+                        launch { action() }
+                    }
+                }
+            }
+            modifier = when (keys.size) {
+                0 -> modifier.pointerInput(Unit, lambda)
+                1 -> modifier.pointerInput(keys[0], lambda)
+                2 -> modifier.pointerInput(keys[0], keys[1], lambda)
+                else -> modifier.pointerInput(*keys, block = lambda)
+            }
         }
         return this
     }

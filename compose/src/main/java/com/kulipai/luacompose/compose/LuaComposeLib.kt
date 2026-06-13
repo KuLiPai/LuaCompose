@@ -55,7 +55,12 @@ object LuaComposeLib {
         composeTable.set("remember", ComposeBridge.engine.createFunction { args ->
             val scope = ComposeBridge.getActiveScope()
                 ?: throw RuntimeException("compose.remember() 必须在 Compose 上下文中调用")
-            scope.getOrCreateRemember(args[0].asFunction())
+            if (args.isEmpty()) throw RuntimeException("compose.remember() requires at least a calculation block")
+            val func = args.last()
+            if (!func.isFunction()) throw RuntimeException("The last argument to compose.remember() must be a function")
+            
+            val keys = args.dropLast(1).map { ComposeBridge.scriptToJava(it) }
+            scope.getOrCreateRemember(func.asFunction(), keys)
         })
 
         composeTable.set("derivedStateOf", ComposeBridge.engine.createFunction { args ->
@@ -123,6 +128,52 @@ object LuaComposeLib {
             childScope.childScopes.keys.retainAll(childScope.accessedChildScopes)
             
             result
+        })
+
+        composeTable.set("rememberCoroutineScope", ComposeBridge.engine.createFunction {
+            val scope = ComposeBridge.getActiveScope()
+            val coroutineScope = scope?.coroutineScope ?: kotlinx.coroutines.GlobalScope
+            val table = ComposeBridge.engine.createTable()
+            table.set("launch", ComposeBridge.engine.createFunction { args ->
+                val block = args.getOrNull(0)
+                if (block != null && block.isFunction()) {
+                    coroutineScope.launch(Dispatchers.Main) {
+                        try {
+                            block.asFunction().call()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+                ComposeBridge.engine.createNil()
+            })
+            table
+        })
+
+        composeTable.set("LaunchedEffect", ComposeBridge.engine.createFunction { args ->
+            val scope = ComposeBridge.getActiveScope() ?: return@createFunction ComposeBridge.engine.createNil()
+            val numArgs = args.size
+            if (numArgs == 0) return@createFunction ComposeBridge.engine.createNil()
+            
+            val effectFunc = args[numArgs - 1]
+            if (effectFunc.isFunction()) {
+                val keys = mutableListOf<Any?>()
+                for (i in 0 until numArgs - 1) {
+                    keys.add(ComposeBridge.scriptToJava(args[i]))
+                }
+                val effectKey = "launched_effect_${keys.hashCode()}"
+                if (scope.effectStates[effectKey] == null) {
+                    scope.effectStates[effectKey] = true
+                    scope.coroutineScope?.launch(Dispatchers.Main) {
+                        try {
+                            effectFunc.asFunction().call()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+            ComposeBridge.engine.createNil()
         })
 
         composeTable.set("DisposableEffect", ComposeBridge.engine.createFunction { args ->

@@ -24,6 +24,8 @@ import com.kulipai.luacompose.compose.runtime.ComposeBridge
 import com.kulipai.luacompose.compose.LuaComposeRegistry
 import com.kulipai.luacompose.compose.createComposeDrawScope
 import com.kulipai.luacompose.compose.runtime.ComposeScope
+import kotlinx.coroutines.launch
+import androidx.compose.foundation.gestures.detectDragGestures
 import com.kulipai.luacompose.compose.ui.graphics.ComposeScopeComponent
 import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
 import com.kulipai.luacompose.compose.ui.resolveDp
@@ -84,6 +86,10 @@ class FoundationPlugin : ComposeScriptPlugin {
             ComposeBridge.javaToScript(RoundedCornerShape(radius))
         })
         scriptTable.set("CircleShape", ComposeBridge.javaToScript(CircleShape))
+
+        scriptTable.set("Modifier", ComposeBridge.engine.createFunction { _ ->
+            ComposeBridge.javaToScript(com.kulipai.luacompose.compose.ui.LuaModifier())
+        })
 
         // -------------- Arrangement ------------------
         val arrangementTable = ComposeBridge.engine.createTable()
@@ -196,6 +202,56 @@ class FoundationPlugin : ComposeScriptPlugin {
 
         scriptTable.set("FontWeight", fontWeightTable)
 
-        
+        // -------------- Gestures ------------------
+
+        val gesturesTable = ComposeBridge.engine.createTable()
+        gesturesTable.set("detectDragGestures", ComposeBridge.engine.createFunction { args ->
+            val actions = ComposeBridge.getActivePointerInputScopeActions() ?: return@createFunction ComposeBridge.engine.createNil()
+            
+            var onDrag: com.kulipai.luacompose.compose.script.ScriptFunction? = null
+            var onDragEnd: com.kulipai.luacompose.compose.script.ScriptFunction? = null
+            
+            val arg1 = args.getOrNull(0)
+            if (arg1 != null && arg1.isTable()) {
+                val t = arg1.asTable()
+                val od = t.get("onDrag")
+                if (od.isFunction()) onDrag = od.asFunction()
+                val ode = t.get("onDragEnd")
+                if (ode.isFunction()) onDragEnd = ode.asFunction()
+            }
+            
+            actions.add {
+                detectDragGestures(
+                    onDragEnd = {
+                        if (onDragEnd != null) {
+                            try {
+                                onDragEnd!!.call()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    },
+                    onDrag = { change: androidx.compose.ui.input.pointer.PointerInputChange, dragAmount: androidx.compose.ui.geometry.Offset ->
+                        if (onDrag != null) {
+                            try {
+                                val changeTable = ComposeBridge.engine.createTable()
+                                changeTable.set("consume", ComposeBridge.engine.createFunction { 
+                                    change.consume()
+                                    ComposeBridge.engine.createNil()
+                                })
+                                val dragAmountTable = ComposeBridge.engine.createTable()
+                                dragAmountTable.set("x", ComposeBridge.engine.createValue(dragAmount.x.toDouble()))
+                                dragAmountTable.set("y", ComposeBridge.engine.createValue(dragAmount.y.toDouble()))
+                                onDrag!!.call(changeTable, dragAmountTable)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    }
+                )
+            }
+            ComposeBridge.engine.createNil()
+        })
+        scriptTable.set("gestures", gesturesTable)
     }
 }

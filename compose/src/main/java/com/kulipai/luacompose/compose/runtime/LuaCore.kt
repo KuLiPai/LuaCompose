@@ -1,4 +1,4 @@
-package com.kulipai.luacompose.compose
+package com.kulipai.luacompose.compose.runtime
 
 import android.content.Context
 import androidx.compose.material3.ColorScheme

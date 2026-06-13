@@ -1,126 +1,98 @@
 package com.kulipai.luacompose.compose
 
-
-import androidx.compose.animation.VectorConverter
-import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.VectorConverter
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import org.luaj.LuaFunction
-import org.luaj.LuaTable
-import org.luaj.LuaValue
-import org.luaj.lib.OneArgFunction
-import org.luaj.lib.TwoArgFunction
-import org.luaj.lib.ZeroArgFunction
+import com.kulipai.luacompose.compose.script.ScriptFunction
+import com.kulipai.luacompose.compose.script.ScriptTable
+import com.kulipai.luacompose.compose.script.ScriptValue
+import com.kulipai.luacompose.compose.runtime.ComposeBridge
+import com.kulipai.luacompose.compose.runtime.ComposeNode
+import com.kulipai.luacompose.compose.ui.resolveDp
+import com.kulipai.luacompose.compose.ui.resolveSp
 
-class LuaComposeLib : TwoArgFunction() {
-    var rootContentFunc: LuaFunction? = null
+object LuaComposeLib {
+    var rootContentFunc: ScriptFunction? = null
 
-    override fun call(modname: LuaValue, env: LuaValue): LuaValue {
-        val composeTable = LuaTable()
+    fun inject(env: ScriptTable): ScriptTable {
+        val composeTable = ComposeBridge.engine.createTable()
         env.set("compose", composeTable)
 
-
-
-        composeTable.set("dp", object : OneArgFunction() {
-            override fun call(arg: LuaValue): LuaValue {
-                return LuaBridge.javaToLuaValue(resolveDp(LuaBridge.luaValueToJava(arg)))
-            }
+        composeTable.set("dp", ComposeBridge.engine.createFunction { args ->
+            ComposeBridge.javaToScript(resolveDp(ComposeBridge.scriptToJava(args[0])))
         })
-        composeTable.set("sp", object : OneArgFunction() {
-            override fun call(arg: LuaValue): LuaValue {
-                return LuaBridge.javaToLuaValue(resolveSp(LuaBridge.luaValueToJava(arg)))
-            }
+        
+        composeTable.set("sp", ComposeBridge.engine.createFunction { args ->
+            ComposeBridge.javaToScript(resolveSp(ComposeBridge.scriptToJava(args[0])))
         })
 
-        composeTable.set("setContent", object : OneArgFunction() {
-            override fun call(func: LuaValue): LuaValue {
-                rootContentFunc = func.checkfunction()
-                return NIL
-            }
+        composeTable.set("setContent", ComposeBridge.engine.createFunction { args ->
+            rootContentFunc = args[0].asFunction()
+            ComposeBridge.engine.createNil()
         })
 
-        composeTable.set("state", object : OneArgFunction() {
-            override fun call(initialValue: LuaValue): LuaValue {
-                val scope = LuaBridge.getActiveScope()
-                    ?: throw RuntimeException("compose.state() 必须在 Compose 上下文中调用")
-                return scope.get("state").call(scope, initialValue)
-            }
+        composeTable.set("state", ComposeBridge.engine.createFunction { args ->
+            val scope = ComposeBridge.getActiveScope()
+                ?: throw RuntimeException("compose.state() 必须在 Compose 上下文中调用")
+            scope.getOrCreateState(args[0])
         })
 
-        composeTable.set("remember", object : OneArgFunction() {
-            override fun call(initFunc: LuaValue): LuaValue {
-                val scope = LuaBridge.getActiveScope()
-                    ?: throw RuntimeException("compose.remember() 必须在 Compose 上下文中调用")
-                return scope.get("remember").call(scope, initFunc)
-            }
+        composeTable.set("remember", ComposeBridge.engine.createFunction { args ->
+            val scope = ComposeBridge.getActiveScope()
+                ?: throw RuntimeException("compose.remember() 必须在 Compose 上下文中调用")
+            scope.getOrCreateRemember(args[0].asFunction())
         })
 
-        composeTable.set("derivedStateOf", object : OneArgFunction() {
-            override fun call(computeFunc: LuaValue): LuaValue {
-                val scope = LuaBridge.getActiveScope()
-                    ?: throw RuntimeException("compose.derivedStateOf() 必须在 Compose 上下文中调用")
-                return scope.get("derivedStateOf").call(scope, computeFunc)
-            }
+        composeTable.set("derivedStateOf", ComposeBridge.engine.createFunction { args ->
+            val scope = ComposeBridge.getActiveScope()
+                ?: throw RuntimeException("compose.derivedStateOf() 必须在 Compose 上下文中调用")
+            scope.getOrCreateDerivedState(args[0].asFunction())
         })
 
-
-
-
-        composeTable.set("Path", object : ZeroArgFunction() {
-            override fun call(): LuaValue {
-                return LuaPath()
-            }
-        })
-
-        // Also register old paths temporarily for backwards compatibility? No, user explicitly wants it isolated.
-
-
-        composeTable.set("LaunchedEffect", object : OneArgFunction() {
-            override fun call(effectFunc: LuaValue): LuaValue {
-                val activeScope = LuaBridge.getActiveScope()
-                if (activeScope != null) {
-                    val key = "effect_\${effectFunc.hashCode()}"
-                    if (activeScope.get(key).isnil()) {
-                        activeScope.set(key, LuaValue.valueOf(true))
-                        activeScope.coroutineScope?.launch(Dispatchers.Default) {
-                            try {
-                                effectFunc.checkfunction().call()
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
+        composeTable.set("LaunchedEffect", ComposeBridge.engine.createFunction { args ->
+            val effectFunc = args[0]
+            val activeScope = ComposeBridge.getActiveScope()
+            if (activeScope != null && effectFunc.isFunction()) {
+                val key = "effect_${effectFunc.hashCode()}"
+                if (activeScope.effectStates[key] == null) {
+                    activeScope.effectStates[key] = true
+                    activeScope.coroutineScope?.launch(Dispatchers.Default) {
+                        try {
+                            effectFunc.asFunction().call()
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
                     }
                 }
-                return NIL
             }
+            ComposeBridge.engine.createNil()
         })
 
-        composeTable.set("DisposableEffect", object : OneArgFunction() {
-            override fun call(effectFunc: LuaValue): LuaValue {
-                val activeScope = LuaBridge.getActiveScope()
-                if (activeScope != null) {
-                    val key = "effect_\${effectFunc.hashCode()}"
-                    if (activeScope.get(key).isnil()) {
-                        activeScope.set(key, valueOf(true))
-                        effectFunc.checkfunction().call()
-                    }
+        composeTable.set("DisposableEffect", ComposeBridge.engine.createFunction { args ->
+            val effectFunc = args[0]
+            val activeScope = ComposeBridge.getActiveScope()
+            if (activeScope != null && effectFunc.isFunction()) {
+                val key = "effect_${effectFunc.hashCode()}"
+                if (activeScope.effectStates[key] == null) {
+                    activeScope.effectStates[key] = true
+                    effectFunc.asFunction().call()
                 }
-                return LuaValue.NIL
             }
+            ComposeBridge.engine.createNil()
         })
 
         LuaComposeRegistry.plugins.forEach { plugin ->
             val targetTable = if (plugin.namespace != null) {
-                var nsTable = composeTable.get(plugin.namespace)
-                if (nsTable.isnil()) {
-                    nsTable = LuaTable()
-                    composeTable.set(plugin.namespace, nsTable)
+                val parts = plugin.namespace!!.split(".")
+                var currentTable = composeTable
+                for (part in parts) {
+                    var nextTable = currentTable.get(part)
+                    if (nextTable.isNil()) {
+                        nextTable = ComposeBridge.engine.createTable()
+                        currentTable.set(part, nextTable)
+                    }
+                    currentTable = nextTable.asTable()
                 }
-                nsTable as LuaTable
+                currentTable
             } else {
                 composeTable
             }
@@ -130,31 +102,31 @@ class LuaComposeLib : TwoArgFunction() {
             plugin.getComponents().forEach { (componentName, _) ->
                 val fullTypeName =
                     if (plugin.namespace != null) "${plugin.namespace}.$componentName" else componentName
-                val func = object : OneArgFunction() {
-                    override fun call(arg: LuaValue): LuaValue {
-                        val props = mutableMapOf<String, Any?>()
-                        var contentFunc: org.luaj.LuaFunction? = null
-                        if (arg.isfunction()) {
-                            contentFunc = arg.checkfunction()
-                        } else if (arg.istable()) {
-                            val luaMap = arg.checktable()
-                            props.putAll(LuaBridge.luaTableToMap(luaMap))
-                            val content = luaMap.get("content")
-                            if (content.isfunction()) {
-                                contentFunc = content.checkfunction()
-                                props.remove("content")
-                            }
+                
+                val func = ComposeBridge.engine.createFunction { args ->
+                    val arg = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
+                    val props = mutableMapOf<String, Any?>()
+                    var contentFunc: ScriptFunction? = null
+                    if (arg.isFunction()) {
+                        contentFunc = arg.asFunction()
+                    } else if (arg.isTable()) {
+                        val scriptTable = arg.asTable()
+                        props.putAll(ComposeBridge.scriptTableToMap(scriptTable))
+                        val content = scriptTable.get("content")
+                        if (content.isFunction()) {
+                            contentFunc = content.asFunction()
+                            props.remove("content")
                         }
-
-                        val activeScope = LuaBridge.getActiveScope()
-                        val childScope = if (contentFunc != null && activeScope != null) {
-                            activeScope.getOrCreateChildScope(contentFunc)
-                        } else null
-
-                        val node = LuaNode(fullTypeName, props, childScope)
-                        LuaBridge.getActiveNodeList()?.add(node)
-                        return LuaValue.NIL
                     }
+
+                    val activeScope = ComposeBridge.getActiveScope()
+                    val childScope = if (contentFunc != null && activeScope != null) {
+                        activeScope.getOrCreateChildScope(contentFunc)
+                    } else null
+
+                    val node = ComposeNode(fullTypeName, props, childScope)
+                    ComposeBridge.getActiveNodeList()?.add(node)
+                    ComposeBridge.engine.createNil()
                 }
                 targetTable.set(componentName, func)
             }

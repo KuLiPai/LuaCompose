@@ -12,10 +12,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.kulipai.luacompose.compose.LuaModifier
-import com.kulipai.luacompose.compose.LuaScope
-import com.kulipai.luacompose.compose.LuaScopeComponent
+import com.kulipai.luacompose.compose.ui.LuaModifier
+import com.kulipai.luacompose.compose.runtime.ComposeScope
+import com.kulipai.luacompose.compose.ui.graphics.ComposeScopeComponent
 import com.kulipai.luacompose.ui.theme.LuaComposeTheme
+import com.kulipai.luacompose.adapter.LuajEngine
+import com.kulipai.luacompose.compose.LuaComposeLib
+import com.kulipai.luacompose.compose.runtime.ComposeBridge
 import org.luaj.Globals
 import org.luaj.LuaFunction
 import org.luaj.LuaValue
@@ -44,7 +47,7 @@ class MainActivity : ComponentActivity() {
 fun LuaAppRunner(context: Context) {
     var reloadTrigger by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var rootScope by remember { mutableStateOf<LuaScope?>(null) }
+    var rootScope by remember { mutableStateOf<ComposeScope?>(null) }
 
     // 当 reloadTrigger 变化时，重新从 SD 卡加载 Lua 代码
     LaunchedEffect(reloadTrigger) {
@@ -92,7 +95,7 @@ fun LuaAppRunner(context: Context) {
             } else {
                 rootScope?.let {
                     key(rootScope) {
-                        LuaScopeComponent(it)
+                        ComposeScopeComponent(it)
                     }
                 } ?: Box(
                     modifier = Modifier.fillMaxSize(),
@@ -106,13 +109,14 @@ fun LuaAppRunner(context: Context) {
 }
 
 // 动态读取并加载 Lua 执行环境
-fun loadLuaScope(context: Context): LuaScope {
+fun loadLuaScope(context: Context): ComposeScope {
     // 1. 初始化 luaj++ 虚拟机环境
     val globals: Globals = JsePlatform.standardGlobals()
 
     // 2. 初始化 Kotlin 侧实现的 Compose DSL 库
-    val composeLib = com.kulipai.luacompose.compose.LuaComposeLib()
-    composeLib.call(org.luaj.LuaValue.valueOf("compose"), globals)
+    ComposeBridge.engine = LuajEngine
+    val env = LuajEngine.wrap(globals).asTable()
+    LuaComposeLib.inject(env)
 
     // 3. 注册 Modifier 全局对象
     globals.set("Modifier", object : ZeroArgFunction() {
@@ -208,12 +212,12 @@ fun loadLuaScope(context: Context): LuaScope {
     val userScriptResult = globals.load(scriptContent, "main.lua").call()
 
     // 6. 优先从 compose.rootContentFunc 读取布局函数，其次从脚本返回值中读取
-    val rootLuaFunction = composeLib.rootContentFunc
-        ?: userScriptResult as? LuaFunction
+    val rootLuaFunction = LuaComposeLib.rootContentFunc
+        ?: (LuajEngine.wrap(userScriptResult).takeIf { it.isFunction() }?.asFunction())
         ?: throw RuntimeException("请使用 compose.setContent(function) 设置布局，或者在 main.lua 结尾返回布局函数")
 
-    // 7. 创建 Kotlin 侧的 LuaScope
-    val rootScope = LuaScope(rootLuaFunction)
+    // 7. 创建 Kotlin 侧的 ComposeScope
+    val rootScope = ComposeScope(rootLuaFunction)
 
     return rootScope
 }

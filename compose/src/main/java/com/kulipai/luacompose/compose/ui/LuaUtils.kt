@@ -1,4 +1,4 @@
-package com.kulipai.luacompose.compose
+package com.kulipai.luacompose.compose.ui
 
 import android.annotation.SuppressLint
 import androidx.compose.ui.Modifier
@@ -61,8 +61,8 @@ fun resolveShape(shapeProp: Any?): androidx.compose.ui.graphics.Shape? {
             else -> null
         }
     }
-    if (shapeProp is org.luaj.LuaValue && shapeProp.isuserdata()) {
-        val ud = shapeProp.checkuserdata()
+    if (shapeProp is com.kulipai.luacompose.compose.script.ScriptValue && shapeProp.isUserdata()) {
+        val ud = shapeProp.asUserdata()
         if (ud is androidx.compose.ui.graphics.Shape) return ud
     }
     return null

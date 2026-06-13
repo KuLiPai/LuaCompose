@@ -7,134 +7,152 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import com.kulipai.luacompose.compose.plugins.AnimationPlugin
-import com.kulipai.luacompose.compose.plugins.FoundationPlugin
-import com.kulipai.luacompose.compose.plugins.LuaComposePlugin
-import com.kulipai.luacompose.compose.plugins.Material3Plugin
-import org.luaj.LuaTable
-import org.luaj.LuaValue
+import com.kulipai.luacompose.compose.animation.AnimationPlugin
+import com.kulipai.luacompose.compose.foundation.FoundationPlugin
+import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
+import com.kulipai.luacompose.compose.material3.Material3Plugin
+import com.kulipai.luacompose.compose.runtime.ComposeScope
+import com.kulipai.luacompose.compose.ui.resolveColor
+import com.kulipai.luacompose.compose.script.ScriptTable
+import com.kulipai.luacompose.compose.script.ScriptValue
+import com.kulipai.luacompose.compose.runtime.ComposeBridge
 
-class LuaPath(val path: Path = Path()) : LuaTable() {
-    init {
-        set("moveTo", object : org.luaj.lib.TwoArgFunction() {
-            override fun call(x: LuaValue, y: LuaValue): LuaValue {
-                path.moveTo(x.tofloat(), y.tofloat())
-                return this@LuaPath
-            }
-        })
-        set("lineTo", object : org.luaj.lib.TwoArgFunction() {
-            override fun call(x: LuaValue, y: LuaValue): LuaValue {
-                path.lineTo(x.tofloat(), y.tofloat())
-                return this@LuaPath
-            }
-        })
-        set("quadraticBezierTo", object : org.luaj.lib.VarArgFunction() {
-            override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
-                path.quadraticBezierTo(
-                    args.checkdouble(1).toFloat(), args.checkdouble(2).toFloat(),
-                    args.checkdouble(3).toFloat(), args.checkdouble(4).toFloat()
-                )
-                return this@LuaPath
-            }
-        })
-        set("cubicTo", object : org.luaj.lib.VarArgFunction() {
-            override fun invoke(args: org.luaj.Varargs): org.luaj.Varargs {
-                path.cubicTo(
-                    args.checkdouble(1).toFloat(), args.checkdouble(2).toFloat(),
-                    args.checkdouble(3).toFloat(), args.checkdouble(4).toFloat(),
-                    args.checkdouble(5).toFloat(), args.checkdouble(6).toFloat()
-                )
-                return this@LuaPath
-            }
-        })
-        set("close", object : org.luaj.lib.ZeroArgFunction() {
-            override fun call(): LuaValue {
-                path.close()
-                return this@LuaPath
-            }
-        })
-    }
+fun createScriptPath(path: Path = Path()): ScriptTable {
+    val table = ComposeBridge.engine.createTable()
+    table.set("path", ComposeBridge.engine.createUserdata(path))
+    
+    table.set("moveTo", ComposeBridge.engine.createFunction { args ->
+        path.moveTo(args[0].toFloat(), args[1].toFloat())
+        table
+    })
+    table.set("lineTo", ComposeBridge.engine.createFunction { args ->
+        path.lineTo(args[0].toFloat(), args[1].toFloat())
+        table
+    })
+    table.set("quadraticBezierTo", ComposeBridge.engine.createFunction { args ->
+        path.quadraticBezierTo(
+            args[0].toFloat(), args[1].toFloat(),
+            args[2].toFloat(), args[3].toFloat()
+        )
+        table
+    })
+    table.set("cubicTo", ComposeBridge.engine.createFunction { args ->
+        path.cubicTo(
+            args[0].toFloat(), args[1].toFloat(),
+            args[2].toFloat(), args[3].toFloat(),
+            args[4].toFloat(), args[5].toFloat()
+        )
+        table
+    })
+    table.set("close", ComposeBridge.engine.createFunction {
+        path.close()
+        table
+    })
+    
+    return table
 }
 
-class LuaDrawScope(val drawScope: DrawScope) : LuaTable() {
-    init {
-        set("drawRect", object : org.luaj.lib.OneArgFunction() {
-            override fun call(args: LuaValue): LuaValue {
-                val color = resolveColor(args.get("color"))
-                val x = args.get("x").optdouble(0.0).toFloat()
-                val y = args.get("y").optdouble(0.0).toFloat()
-                val width = args.get("width").optdouble(100.0).toFloat()
-                val height = args.get("height").optdouble(100.0).toFloat()
-                drawScope.drawRect(
-                    color = color,
-                    topLeft = Offset(x, y),
-                    size = Size(width, height)
+fun createComposeDrawScope(drawScope: DrawScope): ScriptTable {
+    val table = ComposeBridge.engine.createTable()
+    
+    table.set("drawRect", ComposeBridge.engine.createFunction { args ->
+        val mapArgs = args[0].asTable()
+        val color = resolveColor(ComposeBridge.scriptToJava(mapArgs.get("color")))
+        val xVal = mapArgs.get("x")
+        val yVal = mapArgs.get("y")
+        val widthVal = mapArgs.get("width")
+        val heightVal = mapArgs.get("height")
+        val x = if (!xVal.isNil()) xVal.toFloat() else 0f
+        val y = if (!yVal.isNil()) yVal.toFloat() else 0f
+        val width = if (!widthVal.isNil()) widthVal.toFloat() else 100f
+        val height = if (!heightVal.isNil()) heightVal.toFloat() else 100f
+        
+        drawScope.drawRect(
+            color = color,
+            topLeft = Offset(x, y),
+            size = Size(width, height)
+        )
+        ComposeBridge.engine.createNil()
+    })
+    
+    table.set("drawRoundRect", ComposeBridge.engine.createFunction { args ->
+        val mapArgs = args[0].asTable()
+        val color = resolveColor(ComposeBridge.scriptToJava(mapArgs.get("color")))
+        val xVal = mapArgs.get("x")
+        val yVal = mapArgs.get("y")
+        val widthVal = mapArgs.get("width")
+        val heightVal = mapArgs.get("height")
+        val cornerXVal = mapArgs.get("cornerRadiusX")
+        val cornerYVal = mapArgs.get("cornerRadiusY")
+        
+        val x = if (!xVal.isNil()) xVal.toFloat() else 0f
+        val y = if (!yVal.isNil()) yVal.toFloat() else 0f
+        val width = if (!widthVal.isNil()) widthVal.toFloat() else 100f
+        val height = if (!heightVal.isNil()) heightVal.toFloat() else 100f
+        val cornerX = if (!cornerXVal.isNil()) cornerXVal.toFloat() else 0f
+        val cornerY = if (!cornerYVal.isNil()) cornerYVal.toFloat() else cornerX
+        
+        drawScope.drawRoundRect(
+            color = color,
+            topLeft = Offset(x, y),
+            size = Size(width, height),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerX, cornerY)
+        )
+        ComposeBridge.engine.createNil()
+    })
+    
+    table.set("drawCircle", ComposeBridge.engine.createFunction { args ->
+        val mapArgs = args[0].asTable()
+        val color = resolveColor(ComposeBridge.scriptToJava(mapArgs.get("color")))
+        val radiusVal = mapArgs.get("radius")
+        val cxVal = mapArgs.get("centerX")
+        val cyVal = mapArgs.get("centerY")
+        
+        val radius = if (!radiusVal.isNil()) radiusVal.toFloat() else 50f
+        val centerX = if (!cxVal.isNil()) cxVal.toFloat() else drawScope.center.x
+        val centerY = if (!cyVal.isNil()) cyVal.toFloat() else drawScope.center.y
+        
+        drawScope.drawCircle(
+            color = color,
+            radius = radius,
+            center = Offset(centerX, centerY)
+        )
+        ComposeBridge.engine.createNil()
+    })
+    
+    table.set("drawPath", ComposeBridge.engine.createFunction { args ->
+        val mapArgs = args[0].asTable()
+        val color = resolveColor(ComposeBridge.scriptToJava(mapArgs.get("color")))
+        val scriptPath = mapArgs.get("path")
+        
+        if (scriptPath.isTable()) {
+            val pathData = scriptPath.asTable().get("path")
+            if (pathData.isUserdata() && pathData.asUserdata() is Path) {
+                drawScope.drawPath(
+                    path = pathData.asUserdata() as Path,
+                    color = color
                 )
-                return NIL
             }
-        })
-        set("drawRoundRect", object : org.luaj.lib.OneArgFunction() {
-            override fun call(args: LuaValue): LuaValue {
-                val color = resolveColor(args.get("color"))
-                val x = args.get("x").optdouble(0.0).toFloat()
-                val y = args.get("y").optdouble(0.0).toFloat()
-                val width = args.get("width").optdouble(100.0).toFloat()
-                val height = args.get("height").optdouble(100.0).toFloat()
-                val cornerX = args.get("cornerRadiusX").optdouble(0.0).toFloat()
-                val cornerY = args.get("cornerRadiusY").optdouble(cornerX.toDouble()).toFloat()
-                drawScope.drawRoundRect(
-                    color = color,
-                    topLeft = Offset(x, y),
-                    size = Size(width, height),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerX, cornerY)
-                )
-                return NIL
-            }
-        })
-        set("drawCircle", object : org.luaj.lib.OneArgFunction() {
-            override fun call(args: LuaValue): LuaValue {
-                val color = resolveColor(args.get("color"))
-                val radius = args.get("radius").optdouble(50.0).toFloat()
-                val centerX =
-                    args.get("centerX").let { if (it.isnil()) drawScope.center.x else it.tofloat() }
-                val centerY =
-                    args.get("centerY").let { if (it.isnil()) drawScope.center.y else it.tofloat() }
-                drawScope.drawCircle(
-                    color = color,
-                    radius = radius,
-                    center = Offset(centerX, centerY)
-                )
-                return NIL
-            }
-        })
-        set("drawPath", object : org.luaj.lib.OneArgFunction() {
-            override fun call(args: LuaValue): LuaValue {
-                val color = resolveColor(args.get("color"))
-                val luaPath = args.get("path")
-                if (luaPath is LuaPath) {
-                    drawScope.drawPath(
-                        path = luaPath.path,
-                        color = color
-                    )
-                }
-                return NIL
-            }
-        })
-    }
+        }
+        ComposeBridge.engine.createNil()
+    })
+    
+    return table
 }
 
 object LuaComposeRegistry {
     val components =
-        mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: LuaScope?) -> Unit>()
-    val plugins = mutableListOf<LuaComposePlugin>()
+        mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: ComposeScope?) -> Unit>()
+    val plugins = mutableListOf<ComposeScriptPlugin>()
 
     init {
         registerPlugin(FoundationPlugin())
+        registerPlugin(com.kulipai.luacompose.compose.ui.graphics.UiGraphicsPlugin())
         registerPlugin(Material3Plugin())
         registerPlugin(AnimationPlugin())
     }
 
-    fun registerPlugin(plugin: LuaComposePlugin) {
+    fun registerPlugin(plugin: ComposeScriptPlugin) {
         plugins.add(plugin)
         plugin.getComponents().forEach { (name, composable) ->
             val fullName = if (plugin.namespace != null) "${plugin.namespace}.$name" else name

@@ -1,4 +1,4 @@
-package com.kulipai.luacompose.compose
+package com.kulipai.luacompose.compose.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,12 +22,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.rotate
-import org.luaj.LuaFunction
-import org.luaj.LuaValue
+import com.kulipai.luacompose.compose.script.ScriptFunction
+import com.kulipai.luacompose.compose.script.ScriptTable
+import com.kulipai.luacompose.compose.script.ScriptValue
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
+import com.kulipai.luacompose.compose.runtime.ComposeBridge
 
 // --- 3. 极其优雅的链式 Modifier 封装 ---
 class LuaModifier(var modifier: Modifier = Modifier) {
@@ -66,7 +68,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     fun rotate(degrees: Float): LuaModifier { modifier = modifier.rotate(degrees); return this }
     fun offset(x: Any, y: Any): LuaModifier { modifier = modifier.offset(resolveDp(x), resolveDp(y)); return this }
     
-    fun clickable(onClick: LuaFunction): LuaModifier {
+    fun clickable(onClick: ScriptFunction): LuaModifier {
         modifier = modifier.clickable {
             try { onClick.call() } catch (e: Exception) { e.printStackTrace() }
         }
@@ -78,18 +80,18 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return this
     }
 
-    fun pointerInput(gestures: org.luaj.LuaTable): LuaModifier {
-        val onTap = gestures.get("onTap").takeIf { it.isfunction() }?.checkfunction()
-        val onDoubleTap = gestures.get("onDoubleTap").takeIf { it.isfunction() }?.checkfunction()
-        val onLongPress = gestures.get("onLongPress").takeIf { it.isfunction() }?.checkfunction()
-        val onDrag = gestures.get("onDrag").takeIf { it.isfunction() }?.checkfunction()
+    fun pointerInput(gestures: ScriptTable): LuaModifier {
+        val onTap = gestures.get("onTap").takeIf { it.isFunction() }?.asFunction()
+        val onDoubleTap = gestures.get("onDoubleTap").takeIf { it.isFunction() }?.asFunction()
+        val onLongPress = gestures.get("onLongPress").takeIf { it.isFunction() }?.asFunction()
+        val onDrag = gestures.get("onDrag").takeIf { it.isFunction() }?.asFunction()
 
         if (onTap != null || onDoubleTap != null || onLongPress != null) {
             modifier = modifier.pointerInput("tapGestures") {
                 detectTapGestures(
-                    onTap = onTap?.let { fn -> { offset -> fn.call(LuaValue.valueOf(offset.x.toDouble()), LuaValue.valueOf(offset.y.toDouble())) } },
-                    onDoubleTap = onDoubleTap?.let { fn -> { offset -> fn.call(LuaValue.valueOf(offset.x.toDouble()), LuaValue.valueOf(offset.y.toDouble())) } },
-                    onLongPress = onLongPress?.let { fn -> { offset -> fn.call(LuaValue.valueOf(offset.x.toDouble()), LuaValue.valueOf(offset.y.toDouble())) } }
+                    onTap = onTap?.let { fn -> { offset -> fn.call(ComposeBridge.engine.createValue(offset.x.toDouble()), ComposeBridge.engine.createValue(offset.y.toDouble())) } },
+                    onDoubleTap = onDoubleTap?.let { fn -> { offset -> fn.call(ComposeBridge.engine.createValue(offset.x.toDouble()), ComposeBridge.engine.createValue(offset.y.toDouble())) } },
+                    onLongPress = onLongPress?.let { fn -> { offset -> fn.call(ComposeBridge.engine.createValue(offset.x.toDouble()), ComposeBridge.engine.createValue(offset.y.toDouble())) } }
                 )
             }
         }
@@ -98,7 +100,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             modifier = modifier.pointerInput("dragGestures") {
                 detectDragGestures { change, dragAmount -> 
                     change.consume()
-                    onDrag.call(LuaValue.valueOf(dragAmount.x.toDouble()), LuaValue.valueOf(dragAmount.y.toDouble()))
+                    onDrag.call(ComposeBridge.engine.createValue(dragAmount.x.toDouble()), ComposeBridge.engine.createValue(dragAmount.y.toDouble()))
                 }
             }
         }
@@ -134,47 +136,47 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     fun align(alignStr: String): LuaModifier { this.alignmentStr = alignStr; return this }
     fun weight(weight: Float): LuaModifier { this.weightVal = weight; return this }
 
-    private fun anyFromLua(v: LuaValue?): Any? = if (v == null || v.isnil()) null else LuaBridge.luaValueToJava(v)
+    private fun anyFromScript(v: ScriptValue?): Any? = if (v == null || v.isNil()) null else ComposeBridge.scriptToJava(v)
 
-    fun padding(table: org.luaj.LuaTable): LuaModifier {
-        val all = anyFromLua(table.get("all").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() && table.length() == 1 })
+    fun padding(table: ScriptTable): LuaModifier {
+        val all = anyFromScript(table.get("all").takeIf { !it.isNil() } ?: table.get(1).takeIf { !it.isNil() && table.length() == 1 })
         if (all != null) return padding(all)
         
-        val horizontal = anyFromLua(table.get("horizontal").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() && table.length() == 2 })
-        val vertical = anyFromLua(table.get("vertical").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() && table.length() == 2 })
+        val horizontal = anyFromScript(table.get("horizontal").takeIf { !it.isNil() } ?: table.get(1).takeIf { !it.isNil() && table.length() == 2 })
+        val vertical = anyFromScript(table.get("vertical").takeIf { !it.isNil() } ?: table.get(2).takeIf { !it.isNil() && table.length() == 2 })
         if (horizontal != null || vertical != null) return padding(horizontal ?: 0, vertical ?: 0)
         
-        val start = anyFromLua(table.get("start").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() && table.length() == 4 })
-        val top = anyFromLua(table.get("top").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() && table.length() == 4 })
-        val end = anyFromLua(table.get("end").takeIf { !it.isnil() } ?: table.get(3).takeIf { !it.isnil() && table.length() == 4 })
-        val bottom = anyFromLua(table.get("bottom").takeIf { !it.isnil() } ?: table.get(4).takeIf { !it.isnil() && table.length() == 4 })
+        val start = anyFromScript(table.get("start").takeIf { !it.isNil() } ?: table.get(1).takeIf { !it.isNil() && table.length() == 4 })
+        val top = anyFromScript(table.get("top").takeIf { !it.isNil() } ?: table.get(2).takeIf { !it.isNil() && table.length() == 4 })
+        val end = anyFromScript(table.get("end").takeIf { !it.isNil() } ?: table.get(3).takeIf { !it.isNil() && table.length() == 4 })
+        val bottom = anyFromScript(table.get("bottom").takeIf { !it.isNil() } ?: table.get(4).takeIf { !it.isNil() && table.length() == 4 })
         if (start != null || top != null || end != null || bottom != null) {
             return padding(start ?: 0, top ?: 0, end ?: 0, bottom ?: 0)
         }
         return this
     }
 
-    fun size(table: org.luaj.LuaTable): LuaModifier {
-        val size = anyFromLua(table.get("size").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() && table.length() == 1 })
+    fun size(table: ScriptTable): LuaModifier {
+        val size = anyFromScript(table.get("size").takeIf { !it.isNil() } ?: table.get(1).takeIf { !it.isNil() && table.length() == 1 })
         if (size != null) return size(size)
         
-        val width = anyFromLua(table.get("width").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() && table.length() == 2 })
-        val height = anyFromLua(table.get("height").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() && table.length() == 2 })
+        val width = anyFromScript(table.get("width").takeIf { !it.isNil() } ?: table.get(1).takeIf { !it.isNil() && table.length() == 2 })
+        val height = anyFromScript(table.get("height").takeIf { !it.isNil() } ?: table.get(2).takeIf { !it.isNil() && table.length() == 2 })
         if (width != null || height != null) return size(width ?: 0, height ?: 0)
         
         return this
     }
 
-    fun offset(table: org.luaj.LuaTable): LuaModifier {
-        val x = anyFromLua(table.get("x").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() })
-        val y = anyFromLua(table.get("y").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() })
+    fun offset(table: ScriptTable): LuaModifier {
+        val x = anyFromScript(table.get("x").takeIf { !it.isNil() } ?: table.get(1).takeIf { !it.isNil() })
+        val y = anyFromScript(table.get("y").takeIf { !it.isNil() } ?: table.get(2).takeIf { !it.isNil() })
         if (x != null || y != null) return offset(x ?: 0, y ?: 0)
         return this
     }
 
-    fun background(table: org.luaj.LuaTable): LuaModifier {
-        val color = anyFromLua(table.get("color").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() })
-        val shape = anyFromLua(table.get("shape").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() })
+    fun background(table: ScriptTable): LuaModifier {
+        val color = anyFromScript(table.get("color").takeIf { !it.isNil() } ?: table.get(1).takeIf { !it.isNil() })
+        val shape = anyFromScript(table.get("shape").takeIf { !it.isNil() } ?: table.get(2).takeIf { !it.isNil() })
         if (color != null) {
             if (shape != null) return background(color, shape)
             return background(color)
@@ -182,22 +184,22 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return this
     }
 
-    fun clip(table: org.luaj.LuaTable): LuaModifier {
-        val shape = anyFromLua(table.get("shape").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() })
+    fun clip(table: ScriptTable): LuaModifier {
+        val shape = anyFromScript(table.get("shape").takeIf { !it.isNil() } ?: table.get(1).takeIf { !it.isNil() })
         if (shape != null) return clip(shape)
         return this
     }
 
-    fun rotate(table: org.luaj.LuaTable): LuaModifier {
-        val degrees = anyFromLua(table.get("degrees").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() })
+    fun rotate(table: ScriptTable): LuaModifier {
+        val degrees = anyFromScript(table.get("degrees").takeIf { !it.isNil() } ?: table.get(1).takeIf { !it.isNil() })
         if (degrees != null && degrees is Number) return rotate(degrees.toFloat())
         return this
     }
 
-    fun border(table: org.luaj.LuaTable): LuaModifier {
-        val width = anyFromLua(table.get("width").takeIf { !it.isnil() } ?: table.get(1).takeIf { !it.isnil() })
-        val color = anyFromLua(table.get("color").takeIf { !it.isnil() } ?: table.get(2).takeIf { !it.isnil() })
-        val shape = anyFromLua(table.get("shape").takeIf { !it.isnil() } ?: table.get(3).takeIf { !it.isnil() })
+    fun border(table: ScriptTable): LuaModifier {
+        val width = anyFromScript(table.get("width").takeIf { !it.isNil() } ?: table.get(1).takeIf { !it.isNil() })
+        val color = anyFromScript(table.get("color").takeIf { !it.isNil() } ?: table.get(2).takeIf { !it.isNil() })
+        val shape = anyFromScript(table.get("shape").takeIf { !it.isNil() } ?: table.get(3).takeIf { !it.isNil() })
         
         if (width != null && color != null) {
             val resolvedShape = resolveShape(shape)

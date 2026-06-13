@@ -1,4 +1,4 @@
-package com.kulipai.luacompose.compose
+package com.kulipai.luacompose.compose.ui.graphics
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,10 +14,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
-import org.luaj.LuaValue
+import com.kulipai.luacompose.compose.script.ScriptValue
+import com.kulipai.luacompose.compose.runtime.ComposeScope
+import com.kulipai.luacompose.compose.runtime.ComposeNode
+import com.kulipai.luacompose.compose.ui.resolveModifier
+import com.kulipai.luacompose.compose.ui.LuaModifier
+import com.kulipai.luacompose.compose.LuaComposeRegistry
 
 @Composable
-fun LuaScopeComponent(scope: LuaScope, parentComposeScope: Any? = null, vararg args: LuaValue) {
+fun ComposeScopeComponent(scope: ComposeScope, parentComposeScope: Any? = null, vararg args: ScriptValue) {
     scope.coroutineScope = rememberCoroutineScope()
     scope.context = LocalContext.current
     scope.density = LocalDensity.current
@@ -41,12 +46,12 @@ fun LuaScopeComponent(scope: LuaScope, parentComposeScope: Any? = null, vararg a
     ) { scope.execute(*args) }
 
     for (node in nodes) {
-        LuaNodeRenderer(node, parentComposeScope)
+        ComposeNodeRenderer(node, parentComposeScope)
     }
 }
 
 @Composable
-fun LuaNodeRenderer(node: LuaNode, parentComposeScope: Any? = null) {
+fun ComposeNodeRenderer(node: ComposeNode, parentComposeScope: Any? = null) {
     val childModifier = resolveModifier(node.props["modifier"])
     val alignmentStr = (node.props["modifier"] as? LuaModifier)?.alignmentStr
     val weightVal = (node.props["modifier"] as? LuaModifier)?.weightVal
@@ -100,7 +105,7 @@ fun LuaNodeRenderer(node: LuaNode, parentComposeScope: Any? = null) {
             modifier = Modifier.verticalScroll(rememberScrollState())
         ) {
             androidx.compose.material3.Text(
-                text = node.props["text"]?.toString() ?: "Unknown Lua Error",
+                text = node.props["text"]?.toString() ?: "Unknown Script Error",
                 color = Color.Red,
                 modifier = Modifier.padding(16.dp),
                 style = androidx.compose.material3.MaterialTheme.typography.bodyMedium

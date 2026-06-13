@@ -84,6 +84,7 @@ object ComposeBridge {
                 if (isState.isBoolean() && isState.toBoolean()) {
                     table.get("javaState").asUserdata()
                 } else if (isColor.isUserdata()) {
+                    android.util.Log.d("LUA_ANIM", "scriptToJava UNWRAPPING Color: ${isColor.asUserdata()}")
                     isColor.asUserdata()
                 } else {
                     val len = table.length()
@@ -112,6 +113,13 @@ object ComposeBridge {
         return map
     }
 
+    
+    var luaValueUnwrapper: ((Any?) -> Any?)? = null
+
+    fun unwrapAny(value: Any?): Any? {
+        return luaValueUnwrapper?.invoke(value) ?: value
+    }
+
     fun javaToScript(value: Any?): ScriptValue {
         if (value == null) return engine.createNil()
         return when (value) {
@@ -124,8 +132,10 @@ object ComposeBridge {
             is ScriptValue -> value
             else -> {
                 val clazz = value::class.java
+                android.util.Log.d("LUA_ANIM", "javaToScript for clazz: ${clazz.name}")
                 for ((cls, converter) in converters) {
                     if (cls.isAssignableFrom(clazz)) {
+                        android.util.Log.d("LUA_ANIM", "javaToScript MATCHED CONVERTER for clazz: ${clazz.name}")
                         return converter(value)
                     }
                 }

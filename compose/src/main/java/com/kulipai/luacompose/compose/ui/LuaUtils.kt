@@ -16,8 +16,9 @@ fun resolveModifier(prop: Any?): Modifier {
     }
 }
 
-fun resolveColor(colorProp: Any?, defaultColor: Color = Color.Unspecified): Color {
-    return when (colorProp) {
+fun resolveColor(colorPropRaw: Any?, defaultColor: Color = Color.Unspecified): Color {
+    val colorProp = com.kulipai.luacompose.compose.runtime.ComposeBridge.unwrapAny(colorPropRaw)
+    val result = when (colorProp) {
         null -> defaultColor
         is Color -> colorProp
         is Long -> {
@@ -31,9 +32,12 @@ fun resolveColor(colorProp: Any?, defaultColor: Color = Color.Unspecified): Colo
             } catch (_: Exception) { defaultColor }
         }
     }
+    android.util.Log.d("LUA_ANIM", "resolveColor received: ${colorProp?.javaClass?.name} - returned: $result")
+    return result
 }
 
-fun resolveDp(value: Any?): androidx.compose.ui.unit.Dp {
+fun resolveDp(valueRaw: Any?): androidx.compose.ui.unit.Dp {
+    val value = com.kulipai.luacompose.compose.runtime.ComposeBridge.unwrapAny(valueRaw)
     return when (value) {
         is androidx.compose.ui.unit.Dp -> value
         is Number -> value.toFloat().dp
@@ -42,7 +46,8 @@ fun resolveDp(value: Any?): androidx.compose.ui.unit.Dp {
     }
 }
 
-fun resolveSp(value: Any?): androidx.compose.ui.unit.TextUnit {
+fun resolveSp(valueRaw: Any?): androidx.compose.ui.unit.TextUnit {
+    val value = com.kulipai.luacompose.compose.runtime.ComposeBridge.unwrapAny(valueRaw)
     return when (value) {
         is androidx.compose.ui.unit.TextUnit -> value
         is Number -> value.toFloat().sp
@@ -51,7 +56,8 @@ fun resolveSp(value: Any?): androidx.compose.ui.unit.TextUnit {
     }
 }
 
-fun resolveShape(shapeProp: Any?): androidx.compose.ui.graphics.Shape? {
+fun resolveShape(shapePropRaw: Any?): androidx.compose.ui.graphics.Shape? {
+    val shapeProp = com.kulipai.luacompose.compose.runtime.ComposeBridge.unwrapAny(shapePropRaw)
     if (shapeProp is androidx.compose.ui.graphics.Shape) return shapeProp
     if (shapeProp is String) {
         return when (shapeProp.lowercase()) {

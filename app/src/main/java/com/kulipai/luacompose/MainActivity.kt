@@ -115,6 +115,11 @@ fun loadLuaScope(context: Context): ComposeScope {
 
     // 2. 初始化 Kotlin 侧实现的 Compose DSL 库
     ComposeBridge.engine = LuajEngine
+    ComposeBridge.luaValueUnwrapper = { value ->
+        if (value is org.luaj.LuaValue) {
+            ComposeBridge.scriptToJava(LuajEngine.wrap(value))
+        } else value
+    }
     val env = LuajEngine.wrap(globals).asTable()
     LuaComposeLib.inject(env)
 

@@ -42,7 +42,9 @@ class AnimationCorePlugin : ComposeScriptPlugin {
                 }
                 if (key == "snapTo") {
                     return@createFunction engine.createFunction { snapArgs ->
-                        val target = snapArgs.getOrNull(1)?.toFloat() ?: 0f
+                        val isMethodCall = snapArgs.getOrNull(0) == table
+                        val targetArg = if (isMethodCall) snapArgs.getOrNull(1) else snapArgs.getOrNull(0)
+                        val target = targetArg?.toFloat() ?: 0f
                         state.scope.coroutineScope?.launch {
                             state.animatable.snapTo(target)
                             val ms = state.composeState as? androidx.compose.runtime.MutableState<Any?>
@@ -55,16 +57,18 @@ class AnimationCorePlugin : ComposeScriptPlugin {
                 }
                 if (key == "animateTo") {
                     return@createFunction engine.createFunction { animArgs ->
-                        val tableArg = animArgs.getOrNull(1)
+                        val isMethodCall = animArgs.getOrNull(0) == table
+                        val targetArg = if (isMethodCall) animArgs.getOrNull(1) else animArgs.getOrNull(0)
+                        
                         var target = 0f
                         var spec: AnimationSpec<Float>? = null
-                        if (tableArg != null && tableArg.isTable()) {
-                            val t = tableArg.asTable()
+                        if (targetArg != null && targetArg.isTable()) {
+                            val t = targetArg.asTable()
                             target = t.get("targetValue").toFloat()
                             val s = t.get("animationSpec")
                             if (!s.isNil()) spec = parseAnimationSpec<Float>(s.asTable()) as AnimationSpec<Float>
                         } else {
-                            target = animArgs.getOrNull(1)?.toFloat() ?: 0f
+                            target = targetArg?.toFloat() ?: 0f
                         }
                         state.scope.coroutineScope?.launch {
                             val block: Animatable<Float, AnimationVector1D>.() -> Unit = {

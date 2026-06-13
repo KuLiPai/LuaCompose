@@ -275,7 +275,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                 }
                 kotlinx.coroutines.coroutineScope {
                     for (action in actions) {
-                        launch { action() }
+                        launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { action() }
                     }
                 }
             }

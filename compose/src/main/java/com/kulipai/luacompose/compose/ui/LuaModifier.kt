@@ -42,14 +42,32 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     fun fillMaxSize(): LuaModifier { modifier = modifier.fillMaxSize(); return this }
     fun fillMaxWidth(): LuaModifier { modifier = modifier.fillMaxWidth(); return this }
     fun fillMaxHeight(): LuaModifier { modifier = modifier.fillMaxHeight(); return this }
-    fun size(size: Any): LuaModifier { modifier = modifier.size(resolveDp(size)); return this }
+    fun size(size: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(size)
+        if (unwrapped is Map<*, *>) {
+            val width = unwrapped["width"] ?: unwrapped[1.0] ?: unwrapped[1]
+            val height = unwrapped["height"] ?: unwrapped[2.0] ?: unwrapped[2]
+            if (width != null || height != null) return size(width ?: 0, height ?: 0)
+        }
+        modifier = modifier.size(resolveDp(unwrapped))
+        return this
+    }
     fun size(width: Any, height: Any): LuaModifier { modifier = modifier.size(resolveDp(width), resolveDp(height)); return this }
     fun width(width: Any): LuaModifier { modifier = modifier.width(resolveDp(width)); return this }
     fun height(height: Any): LuaModifier { modifier = modifier.height(resolveDp(height)); return this }
     fun wrapContentSize(): LuaModifier { modifier = modifier.wrapContentSize(); return this }
     
     fun background(colorProp: Any): LuaModifier {
-        try { modifier = modifier.background(resolveColor(colorProp)) } catch (e: Exception) { e.printStackTrace() }
+        val unwrapped = ComposeBridge.unwrapAny(colorProp)
+        if (unwrapped is Map<*, *>) {
+            val color = unwrapped["color"] ?: unwrapped[1.0] ?: unwrapped[1]
+            val shape = unwrapped["shape"] ?: unwrapped[2.0] ?: unwrapped[2]
+            if (color != null) {
+                if (shape != null) return background(color, shape)
+                return background(color)
+            }
+        }
+        try { modifier = modifier.background(resolveColor(unwrapped)) } catch (e: Exception) { e.printStackTrace() }
         return this
     }
     fun background(colorProp: Any, shapeProp: Any): LuaModifier {
@@ -67,6 +85,15 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     fun aspectRatio(ratio: Float): LuaModifier { modifier = modifier.aspectRatio(ratio); return this }
     fun rotate(degrees: Float): LuaModifier { modifier = modifier.rotate(degrees); return this }
     fun offset(x: Any, y: Any): LuaModifier { modifier = modifier.offset(resolveDp(x), resolveDp(y)); return this }
+    fun offset(table: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(table)
+        if (unwrapped is Map<*, *>) {
+            val x = unwrapped["x"] ?: unwrapped[1.0] ?: unwrapped[1]
+            val y = unwrapped["y"] ?: unwrapped[2.0] ?: unwrapped[2]
+            if (x != null || y != null) return offset(x ?: 0, y ?: 0)
+        }
+        return offset(unwrapped ?: 0, 0)
+    }
     
     fun clickable(onClick: ScriptFunction): LuaModifier {
         modifier = modifier.clickable {
@@ -119,7 +146,12 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return this
     }
     fun clip(shapeProp: Any): LuaModifier {
-        val clipShape = resolveShape(shapeProp)
+        val unwrapped = ComposeBridge.unwrapAny(shapeProp)
+        if (unwrapped is Map<*, *>) {
+            val shape = unwrapped["shape"] ?: unwrapped[1.0] ?: unwrapped[1]
+            if (shape != null) return clip(shape)
+        }
+        val clipShape = resolveShape(unwrapped)
         if (clipShape != null) { modifier = modifier.clip(clipShape) }
         return this
     }

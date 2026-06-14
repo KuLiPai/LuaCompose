@@ -44,6 +44,23 @@ internal fun registerLayoutComponents(map: MutableMap<String, @Composable (props
             childScope?.let { ComposeScopeComponent(it, this) }
         }
     }
+    map["BoxWithConstraints"] = { props, childScope ->
+        val modifier = resolveModifier(props["modifier"])
+        androidx.compose.foundation.layout.BoxWithConstraints(
+            modifier = modifier,
+            contentAlignment = LuaComposeRegistry.resolveAlignment(props["contentAlignment"])
+        ) {
+            childScope?.let { 
+                val engine = com.kulipai.luacompose.compose.runtime.ComposeBridge.engine
+                val constraintsTable = engine.createTable()
+                constraintsTable.set("minWidth", engine.createValue(minWidth.value.toDouble()))
+                constraintsTable.set("maxWidth", engine.createValue(maxWidth.value.toDouble()))
+                constraintsTable.set("minHeight", engine.createValue(minHeight.value.toDouble()))
+                constraintsTable.set("maxHeight", engine.createValue(maxHeight.value.toDouble()))
+                ComposeScopeComponent(it, this, constraintsTable) 
+            }
+        }
+    }
     map["ScrollableColumn"] = { props, childScope ->
         val modifier = resolveModifier(props["modifier"]).verticalScroll(rememberScrollState())
         Column(

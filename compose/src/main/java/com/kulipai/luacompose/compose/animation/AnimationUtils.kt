@@ -5,6 +5,8 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.DurationBasedAnimationSpec
+import androidx.compose.animation.core.EaseInOutCubic
+import androidx.compose.animation.core.EaseOutBounce
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -102,11 +104,13 @@ fun <T> parseAnimationSpec(table: ScriptTable): AnimationSpec<T> {
             val del2 = table.get("delay")
             val delay = if (!del.isNil()) del.toInt() else if (!del2.isNil()) del2.toInt() else 0
             val eas = table.get("easing")
-            val easingStr = if (!eas.isNil()) eas.toStringValue() else "FastOutSlowIn"
+            val easingStr = if (!eas.isNil()) eas.toStringValue() else "FastOutSlowInEasing"
             val easing = when (easingStr) {
-                "Linear" -> LinearEasing
-                "FastOutLinearIn" -> FastOutLinearInEasing
-                "LinearOutSlowIn" -> LinearOutSlowInEasing
+                "LinearEasing" -> LinearEasing
+                "FastOutLinearInEasing" -> FastOutLinearInEasing
+                "LinearOutSlowInEasing" -> LinearOutSlowInEasing
+                "EaseInOutCubic" -> EaseInOutCubic
+                "EaseOutBounce" -> EaseOutBounce
                 else -> FastOutSlowInEasing
             }
             tween(durationMillis = duration, delayMillis = delay, easing = easing)

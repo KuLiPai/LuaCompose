@@ -130,6 +130,45 @@ object LuaComposeLib {
             result
         })
 
+        val contextMeta = ComposeBridge.engine.createTable()
+        contextMeta.set("__index", ComposeBridge.engine.createFunction { args ->
+            val key = args[1].toStringValue()
+            if (key == "current") {
+                val scope = ComposeBridge.getActiveScope()
+                return@createFunction scope?.context?.let { ComposeBridge.engine.createUserdata(it) } ?: ComposeBridge.engine.createNil()
+            }
+            ComposeBridge.engine.createNil()
+        })
+        val localContextTable = ComposeBridge.engine.createTable()
+        localContextTable.setMetatable(contextMeta)
+        composeTable.set("LocalContext", localContextTable)
+
+        val densityMeta = ComposeBridge.engine.createTable()
+        densityMeta.set("__index", ComposeBridge.engine.createFunction { args ->
+            val key = args[1].toStringValue()
+            if (key == "current") {
+                val scope = ComposeBridge.getActiveScope()
+                return@createFunction scope?.density?.let { ComposeBridge.engine.createUserdata(it) } ?: ComposeBridge.engine.createNil()
+            }
+            ComposeBridge.engine.createNil()
+        })
+        val localDensityTable = ComposeBridge.engine.createTable()
+        localDensityTable.setMetatable(densityMeta)
+        composeTable.set("LocalDensity", localDensityTable)
+
+        val configurationMeta = ComposeBridge.engine.createTable()
+        configurationMeta.set("__index", ComposeBridge.engine.createFunction { args ->
+            val key = args[1].toStringValue()
+            if (key == "current") {
+                val scope = ComposeBridge.getActiveScope()
+                return@createFunction scope?.configuration?.let { ComposeBridge.engine.createUserdata(it) } ?: ComposeBridge.engine.createNil()
+            }
+            ComposeBridge.engine.createNil()
+        })
+        val localConfigurationTable = ComposeBridge.engine.createTable()
+        localConfigurationTable.setMetatable(configurationMeta)
+        composeTable.set("LocalConfiguration", localConfigurationTable)
+
         composeTable.set("rememberCoroutineScope", ComposeBridge.engine.createFunction {
             val scope = ComposeBridge.getActiveScope()
             val coroutineScope = scope?.coroutineScope ?: kotlinx.coroutines.GlobalScope

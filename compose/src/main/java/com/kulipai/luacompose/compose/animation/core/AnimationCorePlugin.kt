@@ -93,7 +93,7 @@ class AnimationCorePlugin : ComposeScriptPlugin {
         scriptTable.set("tween", engine.createFunction { args ->
             var duration = 300
             var delay = 0
-            var easingStr = "FastOutSlowIn"
+            var easingStr = "FastOutSlowInEasing"
 
             val arg1 = args.getOrNull(0) ?: engine.createNil()
             if (arg1.isTable()) {
@@ -105,14 +105,14 @@ class AnimationCorePlugin : ComposeScriptPlugin {
                 val del2 = t.get("delay")
                 delay = if (!del.isNil()) del.toInt() else if (!del2.isNil()) del2.toInt() else 0
                 val eas = t.get("easing")
-                easingStr = if (!eas.isNil()) eas.toStringValue() else "FastOutSlowIn"
+                easingStr = if (!eas.isNil()) eas.toStringValue() else "FastOutSlowInEasing"
             } else {
                 val dur = args.getOrNull(0)
                 val del = args.getOrNull(1)
                 val eas = args.getOrNull(2)
                 duration = if (dur != null && !dur.isNil()) dur.toInt() else 300
                 delay = if (del != null && !del.isNil()) del.toInt() else 0
-                easingStr = if (eas != null && !eas.isNil()) eas.toStringValue() else "FastOutSlowIn"
+                easingStr = if (eas != null && !eas.isNil()) eas.toStringValue() else "FastOutSlowInEasing"
             }
 
             val table = engine.createTable()
@@ -232,10 +232,12 @@ class AnimationCorePlugin : ComposeScriptPlugin {
 
         scriptTable.set("animateFloat", scriptTable.get("rememberInfiniteTransition").asFunction().call().asTable().get("animateFloat"))
 
-        scriptTable.set("FastOutSlowInEasing", engine.createValue("FastOutSlowIn"))
-        scriptTable.set("LinearEasing", engine.createValue("Linear"))
-        scriptTable.set("FastOutLinearInEasing", engine.createValue("FastOutLinearIn"))
-        scriptTable.set("LinearOutSlowInEasing", engine.createValue("LinearOutSlowIn"))
+        scriptTable.set("FastOutSlowInEasing", engine.createValue("FastOutSlowInEasing"))
+        scriptTable.set("LinearEasing", engine.createValue("LinearEasing"))
+        scriptTable.set("FastOutLinearInEasing", engine.createValue("FastOutLinearInEasing"))
+        scriptTable.set("LinearOutSlowInEasing", engine.createValue("LinearOutSlowInEasing"))
+        scriptTable.set("EaseInOutCubic", engine.createValue("EaseInOutCubic"))
+        scriptTable.set("EaseOutBounce", engine.createValue("EaseOutBounce"))
 
         val repeatModeTable = engine.createTable()
         repeatModeTable.set("Restart", ComposeBridge.javaToScript(RepeatMode.Restart))

@@ -214,9 +214,9 @@ object LuaComposeRegistry {
     val plugins = mutableListOf<ComposeScriptPlugin>()
 
     init {
-        registerPlugin(FoundationPlugin())
+        registerPlugin(com.kulipai.luacompose.generated.FoundationGeneratedPlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.graphics.UiGraphicsPlugin())
-        registerPlugin(Material3Plugin())
+        registerPlugin(com.kulipai.luacompose.generated.Material3GeneratedPlugin())
         registerPlugin(AnimationPlugin())
         registerPlugin(com.kulipai.luacompose.compose.animation.core.AnimationCorePlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.geometry.UiGeometryPlugin())

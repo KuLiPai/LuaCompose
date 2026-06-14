@@ -144,12 +144,12 @@ fun loadLuaScope(context: Context): ComposeScope {
         val sampleCode = """
             -- main.lua
             local compose = compose
-            local Column = compose.Column
-            local Row = compose.Row
-            local Text = compose.Text
-            local Button = compose.Button
-            local Spacer = compose.Spacer
-            local TextField = compose.TextField
+            local Column = compose.foundation.Column
+            local Row = compose.foundation.Row
+            local Text = compose.material3.Text
+            local Button = compose.material3.Button
+            local Spacer = compose.foundation.Spacer
+            local TextField = compose.material3.TextField
             
             -- 直接使用 setContent 加载布局，无需在末尾使用 return
             compose.setContent(function()

@@ -19,16 +19,18 @@ class LuaComposeProcessor(
         for (symbol in packageSymbols) {
             if (symbol !is KSClassDeclaration) continue
             
-            val annotation = symbol.annotations.find { 
+            val bridgeAnnotations = symbol.annotations.filter { 
                 it.shortName.asString() == "LuaBridgePackage" 
-            } ?: continue
+            }
             
-            val packageName = annotation.arguments.find { it.name?.asString() == "packageName" }?.value as? String ?: continue
-            val category = annotation.arguments.find { it.name?.asString() == "category" }?.value as? String ?: "ui"
-            
-            logger.warn("Processing LuaBridgePackage for: $packageName, category: $category")
-            
-            generateBridgeForPackage(resolver, packageName, category)
+            for (annotation in bridgeAnnotations) {
+                val packageName = annotation.arguments.find { it.name?.asString() == "packageName" }?.value as? String ?: continue
+                val category = annotation.arguments.find { it.name?.asString() == "category" }?.value as? String ?: "ui"
+                
+                logger.warn("Processing LuaBridgePackage for: $packageName, category: $category")
+                
+                generateBridgeForPackage(resolver, packageName, category)
+            }
         }
         
         return emptyList()
@@ -53,22 +55,37 @@ class LuaComposeProcessor(
             return
         }
 
-        val className = "${category.replaceFirstChar { it.uppercase() }}GeneratedPlugin"
+        val className = category.replaceFirstChar { it.uppercase() } + "GeneratedPlugin"
         
-        val fileBuilder = FileSpec.builder("com.kulipai.luacompose.generated", className)
-            .addImport("androidx.compose.runtime", "Composable")
-        
-        val pluginClass = TypeSpec.classBuilder(className)
-            // Ideally implements ComposeScriptPlugin, but for simplicity in demo we'll just create a map generator function
+        val typeSpec = TypeSpec.classBuilder(className)
+            .addSuperinterface(ClassName("com.kulipai.luacompose.compose.runtime", "ComposeScriptPlugin"))
+            .addProperty(
+                PropertySpec.builder("namespace", STRING.copy(nullable = true), KModifier.OVERRIDE)
+                    .initializer("%S", category)
+                    .build()
+            )
+            .addFunction(
+                FunSpec.builder("injectGlobals")
+                    .addModifiers(KModifier.OVERRIDE)
+                    .addParameter("scriptTable", ClassName("com.kulipai.luacompose.compose.script", "ScriptTable"))
+                    .build()
+            )
             .addFunction(
                 FunSpec.builder("getComponents")
+                    .addModifiers(KModifier.OVERRIDE)
                     .returns(MAP.parameterizedBy(
                         STRING,
-                        ClassName("kotlin", "Any")
+                        LambdaTypeName.get(
+                            parameters = arrayOf(
+                                ParameterSpec.unnamed(MAP.parameterizedBy(STRING, ANY.copy(nullable = true))),
+                                ParameterSpec.unnamed(ClassName("com.kulipai.luacompose.compose.runtime", "ComposeScope").copy(nullable = true))
+                            ),
+                            returnType = UNIT
+                        ).copy(annotations = listOf(AnnotationSpec.builder(ClassName("androidx.compose.runtime", "Composable")).build()))
                     ))
                     .apply {
                         addStatement("val functionCache = mutableMapOf<String, kotlin.reflect.KFunction<*>>()")
-                        addStatement("val map = mutableMapOf<String, Any>()")
+                        addStatement("val map = mutableMapOf<String, @androidx.compose.runtime.Composable (Map<String, Any?>, com.kulipai.luacompose.compose.runtime.ComposeScope?) -> Unit>()")
                         for (func in composableFunctions) {
                             val funcName = func.simpleName.asString()
                             val fileName = func.containingFile?.fileName ?: ""
@@ -76,7 +93,7 @@ class LuaComposeProcessor(
                             val fullClassName = "$packageName.$jvmClassName"
                             
                             val codeBlock = """
-                            |map["$funcName"] = com.kulipai.luacompose.compose.LuaComposable { props ->
+                            |map["$funcName"] = { props, childScope ->
                             |    val function = functionCache.getOrPut("$funcName") {
                             |        Class.forName("$fullClassName").kotlin.members.first { it.name == "$funcName" } as kotlin.reflect.KFunction<*>
                             |    }
@@ -85,6 +102,8 @@ class LuaComposeProcessor(
                             |        val propName = param.name
                             |        if (propName != null && props.containsKey(propName)) {
                             |            argsMap[param] = com.kulipai.luacompose.compose.TypeResolver.resolve(props[propName], param.type)
+                            |        } else if (propName == "content" && childScope != null) {
+                            |            argsMap[param] = @androidx.compose.runtime.Composable { com.kulipai.luacompose.compose.ui.graphics.ComposeScopeComponent(childScope, null) }
                             |        }
                             |    }
                             |    function.callBy(argsMap)
@@ -95,10 +114,12 @@ class LuaComposeProcessor(
                         addStatement("return map")
                     }
                     .build()
-            )
+                )
 
-        fileBuilder.addType(pluginClass.build())
-        
-        fileBuilder.build().writeTo(codeGenerator, Dependencies(true))
+            val fileSpec = FileSpec.builder("com.kulipai.luacompose.generated", className)
+                .addType(typeSpec.build())
+                .build()
+
+        fileSpec.writeTo(codeGenerator, Dependencies(true))
     }
 }

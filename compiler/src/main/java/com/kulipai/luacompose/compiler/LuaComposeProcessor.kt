@@ -64,13 +64,33 @@ class LuaComposeProcessor(
                 FunSpec.builder("getComponents")
                     .returns(MAP.parameterizedBy(
                         STRING,
-                        ClassName("kotlin", "Any") // Simplified return type for demo
+                        ClassName("kotlin", "Any")
                     ))
                     .apply {
+                        addStatement("val functionCache = mutableMapOf<String, kotlin.reflect.KFunction<*>>()")
                         addStatement("val map = mutableMapOf<String, Any>()")
                         for (func in composableFunctions) {
                             val funcName = func.simpleName.asString()
-                            addStatement("map[%S] = %S // TODO: Implement callBy logic", funcName, "$packageName.$funcName")
+                            val fileName = func.containingFile?.fileName ?: ""
+                            val jvmClassName = if (fileName.endsWith(".kt")) fileName.replace(".kt", "Kt") else "${funcName}Kt"
+                            val fullClassName = "$packageName.$jvmClassName"
+                            
+                            val codeBlock = """
+                            |map["$funcName"] = com.kulipai.luacompose.compose.LuaComposable { props ->
+                            |    val function = functionCache.getOrPut("$funcName") {
+                            |        Class.forName("$fullClassName").kotlin.members.first { it.name == "$funcName" } as kotlin.reflect.KFunction<*>
+                            |    }
+                            |    val argsMap = mutableMapOf<kotlin.reflect.KParameter, Any?>()
+                            |    for (param in function.parameters) {
+                            |        val propName = param.name
+                            |        if (propName != null && props.containsKey(propName)) {
+                            |            argsMap[param] = com.kulipai.luacompose.compose.TypeResolver.resolve(props[propName], param.type)
+                            |        }
+                            |    }
+                            |    function.callBy(argsMap)
+                            |}
+                            """.trimMargin()
+                            addCode("%L\n", codeBlock)
                         }
                         addStatement("return map")
                     }

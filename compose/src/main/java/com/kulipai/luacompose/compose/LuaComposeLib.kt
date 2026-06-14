@@ -78,7 +78,36 @@ object LuaComposeLib {
         composeTable.set("foundation", foundationTable)
         val foundationLayoutTable = ComposeBridge.engine.createTable()
         foundationTable.set("layout", foundationLayoutTable)
-        foundationLayoutTable.set("Arrangement", ComposeBridge.engine.coerceJavaToScript(androidx.compose.foundation.layout.Arrangement))
+        val arrangementTable = ComposeBridge.engine.createTable()
+        val arrangementMeta = ComposeBridge.engine.createTable()
+        arrangementMeta.set("__index", ComposeBridge.engine.createFunction { args ->
+            val key = args[1].toStringValue()
+            if (key == "spacedBy") {
+                return@createFunction ComposeBridge.engine.createFunction { spacedByArgs ->
+                    val spaceObj = spacedByArgs[0]
+                    val space = if (spaceObj.isNumber()) spaceObj.toDouble().toFloat() else com.kulipai.luacompose.compose.ui.resolveDp(ComposeBridge.scriptToJava(spaceObj)).value
+                    if (spacedByArgs.size > 1) {
+                        val alignObj = ComposeBridge.scriptToJava(spacedByArgs[1])
+                        if (alignObj is androidx.compose.ui.Alignment.Horizontal) {
+                            return@createFunction ComposeBridge.engine.coerceJavaToScript(androidx.compose.foundation.layout.Arrangement.spacedBy(androidx.compose.ui.unit.Dp(space), alignObj))
+                        } else if (alignObj is androidx.compose.ui.Alignment.Vertical) {
+                            return@createFunction ComposeBridge.engine.coerceJavaToScript(androidx.compose.foundation.layout.Arrangement.spacedBy(androidx.compose.ui.unit.Dp(space), alignObj))
+                        }
+                    }
+                    ComposeBridge.engine.coerceJavaToScript(androidx.compose.foundation.layout.Arrangement.spacedBy(androidx.compose.ui.unit.Dp(space)))
+                }
+            }
+            try {
+                val getterName = "get" + key.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+                val method = androidx.compose.foundation.layout.Arrangement::class.java.getMethod(getterName)
+                return@createFunction ComposeBridge.engine.coerceJavaToScript(method.invoke(androidx.compose.foundation.layout.Arrangement))
+            } catch (e: Exception) {
+                return@createFunction ComposeBridge.engine.createNil()
+            }
+        })
+        arrangementTable.setMetatable(arrangementMeta)
+        foundationLayoutTable.set("Arrangement", arrangementTable)
+        uiTable.set("Arrangement", arrangementTable) // Alias for user convenience
 
 
         composeTable.set("state", ComposeBridge.engine.createFunction { args ->

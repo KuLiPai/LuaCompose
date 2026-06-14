@@ -40,10 +40,30 @@ import kotlinx.coroutines.launch
 // --- 3. 极其优雅的链式 Modifier 封装 ---
 class LuaModifier(var modifier: Modifier = Modifier) {
     var alignmentStr: String? = null
+    var alignObject: Any? = null
     var weightVal: Float? = null
+    var weightFill: Boolean = true
 
-    fun padding(dp: Any): LuaModifier {
-        modifier = modifier.padding(resolveDp(dp)); return this
+    fun padding(dpOrTable: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(dpOrTable)
+        if (unwrapped is Map<*, *>) {
+            val all = unwrapped["all"] ?: unwrapped[1.0] ?: unwrapped[1]
+            if (all != null) return padding(all)
+
+            val horizontal = unwrapped["horizontal"] ?: unwrapped[1.0] ?: unwrapped[1]
+            val vertical = unwrapped["vertical"] ?: unwrapped[2.0] ?: unwrapped[2]
+            if (horizontal != null || vertical != null) return padding(horizontal ?: 0, vertical ?: 0)
+
+            val start = unwrapped["start"] ?: unwrapped[1.0] ?: unwrapped[1]
+            val top = unwrapped["top"] ?: unwrapped[2.0] ?: unwrapped[2]
+            val end = unwrapped["end"] ?: unwrapped[3.0] ?: unwrapped[3]
+            val bottom = unwrapped["bottom"] ?: unwrapped[4.0] ?: unwrapped[4]
+            if (start != null || top != null || end != null || bottom != null) {
+                return padding(start ?: 0, top ?: 0, end ?: 0, bottom ?: 0)
+            }
+            return this
+        }
+        modifier = modifier.padding(resolveDp(unwrapped)); return this
     }
 
     fun padding(horizontal: Any, vertical: Any): LuaModifier {
@@ -138,8 +158,17 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         modifier = modifier.aspectRatio(ratio); return this
     }
 
-    fun rotate(degrees: Float): LuaModifier {
-        modifier = modifier.rotate(degrees); return this
+    fun rotate(degrees: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(degrees)
+        if (unwrapped is Map<*, *>) {
+            val deg = unwrapped["degrees"] ?: unwrapped[1.0] ?: unwrapped[1]
+            if (deg is Number) {
+                modifier = modifier.rotate(deg.toFloat())
+            }
+        } else if (unwrapped is Number) {
+            modifier = modifier.rotate(unwrapped.toFloat())
+        }
+        return this
     }
 
     fun offset(x: Any, y: Any): LuaModifier {
@@ -187,11 +216,13 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return this
     }
 
-    fun pointerInput(gestures: ScriptTable): LuaModifier {
-        val onTap = gestures.get("onTap").takeIf { it.isFunction() }?.asFunction()
-        val onDoubleTap = gestures.get("onDoubleTap").takeIf { it.isFunction() }?.asFunction()
-        val onLongPress = gestures.get("onLongPress").takeIf { it.isFunction() }?.asFunction()
-        val onDrag = gestures.get("onDrag").takeIf { it.isFunction() }?.asFunction()
+    fun pointerInput(gestures: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(gestures)
+        if (unwrapped !is Map<*, *>) return this
+        val onTap = unwrapped["onTap"] as? ScriptFunction
+        val onDoubleTap = unwrapped["onDoubleTap"] as? ScriptFunction
+        val onLongPress = unwrapped["onLongPress"] as? ScriptFunction
+        val onDrag = unwrapped["onDrag"] as? ScriptFunction
 
         if (onTap != null || onDoubleTap != null || onLongPress != null) {
             modifier = modifier.pointerInput("tapGestures") {
@@ -308,125 +339,78 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return this
     }
 
-    fun border(width: Int, color: Any): LuaModifier {
+    fun border(tableOrWidth: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(tableOrWidth)
+        if (unwrapped is Map<*, *>) {
+            val width = unwrapped["width"] ?: unwrapped[1.0] ?: unwrapped[1]
+            val color = unwrapped["color"] ?: unwrapped[2.0] ?: unwrapped[2]
+            val shape = unwrapped["shape"] ?: unwrapped[3.0] ?: unwrapped[3]
+            if (width != null && color != null) {
+                val resolvedShape = resolveShape(shape)
+                val w = resolveDp(width)
+                val c = resolveColor(color)
+                if (resolvedShape != null) {
+                    modifier = modifier.border(w, c, resolvedShape)
+                } else {
+                    modifier = modifier.border(w, c)
+                }
+            }
+        }
+        return this
+    }
+
+    fun border(width: Any, color: Any): LuaModifier {
         try {
-            modifier = modifier.border(width.dp, resolveColor(color))
+            modifier = modifier.border(resolveDp(width), resolveColor(color))
         } catch (e: Exception) {
             e.printStackTrace()
         }
         return this
     }
 
-    fun align(alignStr: String): LuaModifier {
-        this.alignmentStr = alignStr; return this
-    }
 
-    fun weight(weight: Float): LuaModifier {
-        this.weightVal = weight; return this
-    }
 
-    private fun anyFromScript(v: ScriptValue?): Any? =
-        if (v == null || v.isNil()) null else ComposeBridge.scriptToJava(v)
-
-    fun padding(table: ScriptTable): LuaModifier {
-        val all = anyFromScript(table.get("all").takeIf { !it.isNil() } ?: table.get(1)
-            .takeIf { !it.isNil() && table.length() == 1 })
-        if (all != null) return padding(all)
-
-        val horizontal =
-            anyFromScript(table.get("horizontal").takeIf { !it.isNil() } ?: table.get(1)
-                .takeIf { !it.isNil() && table.length() == 2 })
-        val vertical = anyFromScript(table.get("vertical").takeIf { !it.isNil() } ?: table.get(2)
-            .takeIf { !it.isNil() && table.length() == 2 })
-        if (horizontal != null || vertical != null) return padding(horizontal ?: 0, vertical ?: 0)
-
-        val start = anyFromScript(table.get("start").takeIf { !it.isNil() } ?: table.get(1)
-            .takeIf { !it.isNil() && table.length() == 4 })
-        val top = anyFromScript(table.get("top").takeIf { !it.isNil() } ?: table.get(2)
-            .takeIf { !it.isNil() && table.length() == 4 })
-        val end = anyFromScript(table.get("end").takeIf { !it.isNil() } ?: table.get(3)
-            .takeIf { !it.isNil() && table.length() == 4 })
-        val bottom = anyFromScript(table.get("bottom").takeIf { !it.isNil() } ?: table.get(4)
-            .takeIf { !it.isNil() && table.length() == 4 })
-        if (start != null || top != null || end != null || bottom != null) {
-            return padding(start ?: 0, top ?: 0, end ?: 0, bottom ?: 0)
+    fun align(alignStrOrObj: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(alignStrOrObj)
+        if (unwrapped is String) {
+            this.alignmentStr = unwrapped
+        } else {
+            this.alignObject = unwrapped
         }
         return this
     }
 
-    fun size(table: ScriptTable): LuaModifier {
-        val size = anyFromScript(table.get("size").takeIf { !it.isNil() } ?: table.get(1)
-            .takeIf { !it.isNil() && table.length() == 1 })
-        if (size != null) return size(size)
-
-        val width = anyFromScript(table.get("width").takeIf { !it.isNil() } ?: table.get(1)
-            .takeIf { !it.isNil() && table.length() == 2 })
-        val height = anyFromScript(table.get("height").takeIf { !it.isNil() } ?: table.get(2)
-            .takeIf { !it.isNil() && table.length() == 2 })
-        if (width != null || height != null) return size(width ?: 0, height ?: 0)
-
-        return this
-    }
-
-    fun offset(table: ScriptTable): LuaModifier {
-        val x = anyFromScript(table.get("x").takeIf { !it.isNil() } ?: table.get(1)
-            .takeIf { !it.isNil() })
-        val y = anyFromScript(table.get("y").takeIf { !it.isNil() } ?: table.get(2)
-            .takeIf { !it.isNil() })
-        if (x != null || y != null) return offset(x ?: 0, y ?: 0)
-        return this
-    }
-
-    fun background(table: ScriptTable): LuaModifier {
-        val color = anyFromScript(table.get("color").takeIf { !it.isNil() } ?: table.get(1)
-            .takeIf { !it.isNil() })
-        val shape = anyFromScript(table.get("shape").takeIf { !it.isNil() } ?: table.get(2)
-            .takeIf { !it.isNil() })
-        if (color != null) {
-            if (shape != null) return background(color, shape)
-            return background(color)
-        }
-        return this
-    }
-
-    fun clip(table: ScriptTable): LuaModifier {
-        val shape = anyFromScript(table.get("shape").takeIf { !it.isNil() } ?: table.get(1)
-            .takeIf { !it.isNil() })
-        if (shape != null) return clip(shape)
-        return this
-    }
-
-    fun rotate(table: ScriptTable): LuaModifier {
-        val degrees = anyFromScript(table.get("degrees").takeIf { !it.isNil() } ?: table.get(1)
-            .takeIf { !it.isNil() })
-        if (degrees != null && degrees is Number) return rotate(degrees.toFloat())
-        return this
-    }
-
-    fun border(table: ScriptTable): LuaModifier {
-        val width = anyFromScript(table.get("width").takeIf { !it.isNil() } ?: table.get(1)
-            .takeIf { !it.isNil() })
-        val color = anyFromScript(table.get("color").takeIf { !it.isNil() } ?: table.get(2)
-            .takeIf { !it.isNil() })
-        val shape = anyFromScript(table.get("shape").takeIf { !it.isNil() } ?: table.get(3)
-            .takeIf { !it.isNil() })
-
-        if (width != null && color != null) {
-            val resolvedShape = resolveShape(shape)
-            val w = resolveDp(width)
-            val c = resolveColor(color)
-            try {
-                if (resolvedShape != null) {
-                    modifier = modifier.border(w, c, resolvedShape)
-                } else {
-                    modifier = modifier.border(w, c)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
+    fun weight(weight: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(weight)
+        if (unwrapped is Map<*, *>) {
+            val w = unwrapped["weight"] ?: unwrapped[1.0] ?: unwrapped[1]
+            val f = unwrapped["fill"] ?: unwrapped[2.0] ?: unwrapped[2]
+            if (w != null) {
+                this.weightVal = (w as? Number)?.toFloat() ?: 1f
             }
+            if (f != null) {
+                this.weightFill = f as? Boolean ?: true
+            }
+        } else if (unwrapped is Number) {
+            this.weightVal = unwrapped.toFloat()
         }
         return this
     }
+
+    fun weight(weight: Any, fill: Any): LuaModifier {
+        val unwrappedWeight = ComposeBridge.unwrapAny(weight)
+        if (unwrappedWeight is Number) {
+            this.weightVal = unwrappedWeight.toFloat()
+        }
+        val unwrappedFill = ComposeBridge.unwrapAny(fill)
+        if (unwrappedFill is Boolean) {
+            this.weightFill = unwrappedFill
+        }
+        return this
+    }
+
+
+
 
 
     fun widthIn(): LuaModifier {
@@ -533,6 +517,9 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     fun scale(scaleX: Float, scaleY: Float): LuaModifier {
         modifier = modifier.scale(scaleX, scaleY); return this
     }
+
+
+
 
 
 }

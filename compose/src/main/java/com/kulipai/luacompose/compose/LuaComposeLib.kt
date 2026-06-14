@@ -135,7 +135,7 @@ object LuaComposeLib {
             val key = args[1].toStringValue()
             if (key == "current") {
                 val scope = ComposeBridge.getActiveScope()
-                return@createFunction scope?.context?.let { ComposeBridge.engine.createUserdata(it) } ?: ComposeBridge.engine.createNil()
+                return@createFunction scope?.context?.let { ComposeBridge.engine.coerceJavaToScript(it) } ?: ComposeBridge.engine.createNil()
             }
             ComposeBridge.engine.createNil()
         })
@@ -148,7 +148,7 @@ object LuaComposeLib {
             val key = args[1].toStringValue()
             if (key == "current") {
                 val scope = ComposeBridge.getActiveScope()
-                return@createFunction scope?.density?.let { ComposeBridge.engine.createUserdata(it) } ?: ComposeBridge.engine.createNil()
+                return@createFunction scope?.density?.let { ComposeBridge.engine.coerceJavaToScript(it) } ?: ComposeBridge.engine.createNil()
             }
             ComposeBridge.engine.createNil()
         })
@@ -161,7 +161,7 @@ object LuaComposeLib {
             val key = args[1].toStringValue()
             if (key == "current") {
                 val scope = ComposeBridge.getActiveScope()
-                return@createFunction scope?.configuration?.let { ComposeBridge.engine.createUserdata(it) } ?: ComposeBridge.engine.createNil()
+                return@createFunction scope?.configuration?.let { ComposeBridge.engine.coerceJavaToScript(it) } ?: ComposeBridge.engine.createNil()
             }
             ComposeBridge.engine.createNil()
         })

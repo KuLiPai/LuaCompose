@@ -120,17 +120,16 @@ class LuaComposeProcessor(
 
                             for ((i, param) in func.parameters.withIndex()) {
                                 val pName = param.name?.asString()
+                                val isComposable = param.annotations.any { it.shortName.asString() == "Composable" }
                                 codeBlock.append("""
                             |    val val_$pName = props["$pName"]
                             |    if (val_$pName is com.kulipai.luacompose.compose.script.ScriptFunction && method.parameterTypes[$i].name.startsWith("kotlin.jvm.functions.Function")) {
-                            |        val scopeToUse = com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()?.getOrCreateChildScope(val_$pName)
-                            |        if (scopeToUse != null) {
-                            |            args[$i] = com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(scopeToUse, method.parameterTypes[$i].name)
-                            |        }
+                            |        val scopeToUse = if ($isComposable) com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()?.getOrCreateChildScope(val_$pName) else null
+                            |        args[$i] = com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(scopeToUse, val_$pName, method.parameterTypes[$i].name, $isComposable)
                             |    } else if (props.containsKey("$pName")) {
                             |        args[$i] = com.kulipai.luacompose.compose.TypeResolver.resolve(val_$pName, method.parameterTypes[$i])
                             |    } else if ("$pName" == "content" && childScope != null) {
-                            |        args[$i] = com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(childScope, method.parameterTypes[$i].name)
+                            |        args[$i] = com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(childScope, null, method.parameterTypes[$i].name, true)
                             |    } else {
                             |        val defaultMaskIndex = $i / 31
                             |        defaultBitmasks[defaultMaskIndex] = defaultBitmasks[defaultMaskIndex] or (1 shl ($i % 31))

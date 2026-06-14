@@ -46,6 +46,41 @@ object LuaComposeLib {
             ComposeBridge.engine.createNil()
         })
 
+        val uiTable = ComposeBridge.engine.createTable()
+        composeTable.set("ui", uiTable)
+        uiTable.set("Alignment", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.Alignment.Companion))
+        
+        val graphicsTable = ComposeBridge.engine.createTable()
+        uiTable.set("graphics", graphicsTable)
+        graphicsTable.set("Color", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.graphics.Color.Companion))
+        graphicsTable.set("RectangleShape", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.graphics.RectangleShape))
+        
+        val layoutTable = ComposeBridge.engine.createTable()
+        uiTable.set("layout", layoutTable)
+        layoutTable.set("ContentScale", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.layout.ContentScale.Companion))
+        
+        val textTable = ComposeBridge.engine.createTable()
+        uiTable.set("text", textTable)
+        val textStyleTable = ComposeBridge.engine.createTable()
+        textTable.set("style", textStyleTable)
+        val textFontTable = ComposeBridge.engine.createTable()
+        textTable.set("font", textFontTable)
+        
+        textStyleTable.set("TextAlign", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.style.TextAlign.Companion))
+        textStyleTable.set("TextDecoration", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.style.TextDecoration.Companion))
+        textStyleTable.set("TextOverflow", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.style.TextOverflow.Companion))
+        
+        textFontTable.set("FontWeight", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.font.FontWeight.Companion))
+        textFontTable.set("FontStyle", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.font.FontStyle.Companion))
+        textFontTable.set("FontFamily", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.font.FontFamily.Companion))
+
+        val foundationTable = ComposeBridge.engine.createTable()
+        composeTable.set("foundation", foundationTable)
+        val foundationLayoutTable = ComposeBridge.engine.createTable()
+        foundationTable.set("layout", foundationLayoutTable)
+        foundationLayoutTable.set("Arrangement", ComposeBridge.engine.coerceJavaToScript(androidx.compose.foundation.layout.Arrangement))
+
+
         composeTable.set("state", ComposeBridge.engine.createFunction { args ->
             val scope = ComposeBridge.getActiveScope()
                 ?: throw RuntimeException("compose.state() 必须在 Compose 上下文中调用")

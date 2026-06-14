@@ -26,3 +26,5 @@ rootProject.name = "luaCompose"
 include(":app")
 include(":androlua")
 include(":compose")
+include(":annotations")
+include(":compiler")

@@ -215,6 +215,7 @@ object LuaComposeRegistry {
 
     init {
         registerPlugin(com.kulipai.luacompose.generated.FoundationGeneratedPlugin())
+        registerPlugin(com.kulipai.luacompose.generated.FoundationLayoutGeneratedPlugin())
         registerPlugin(com.kulipai.luacompose.compose.foundation.FoundationPlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.graphics.UiGraphicsPlugin())
         registerPlugin(com.kulipai.luacompose.generated.Material3GeneratedPlugin())

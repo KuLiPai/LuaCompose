@@ -215,8 +215,10 @@ object LuaComposeRegistry {
 
     init {
         registerPlugin(com.kulipai.luacompose.generated.FoundationGeneratedPlugin())
+        registerPlugin(com.kulipai.luacompose.compose.foundation.FoundationPlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.graphics.UiGraphicsPlugin())
         registerPlugin(com.kulipai.luacompose.generated.Material3GeneratedPlugin())
+        registerPlugin(com.kulipai.luacompose.compose.material3.Material3Plugin())
         registerPlugin(AnimationPlugin())
         registerPlugin(com.kulipai.luacompose.compose.animation.core.AnimationCorePlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.geometry.UiGeometryPlugin())

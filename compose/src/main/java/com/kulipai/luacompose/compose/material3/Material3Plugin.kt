@@ -31,23 +31,9 @@ class Material3Plugin : ComposeScriptPlugin {
     override val namespace: String? = "material3"
 
     override fun getComponents(): Map<String, @Composable (props: Map<String, Any?>, childScope: ComposeScope?) -> Unit> {
-        val map =
-            mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: ComposeScope?) -> Unit>()
-        com.kulipai.luacompose.compose.material3.text.registerTextComponents(map)
-        com.kulipai.luacompose.compose.material3.card.registerCardComponents(map)
-        com.kulipai.luacompose.compose.material3.button.registerButtonComponents(map)
-        com.kulipai.luacompose.compose.material3.textfield.registerTextfieldComponents(map)
-        com.kulipai.luacompose.compose.material3.checkbox.registerCheckboxComponents(map)
-        com.kulipai.luacompose.compose.material3.switch.registerSwitchComponents(map)
-        com.kulipai.luacompose.compose.material3.radiobutton.registerRadiobuttonComponents(map)
-        com.kulipai.luacompose.compose.material3.progressindicator.registerProgressindicatorComponents(
-            map
-        )
-        com.kulipai.luacompose.compose.material3.icon.registerIconComponents(map)
-        com.kulipai.luacompose.compose.material3.divider.registerDividerComponents(map)
-        com.kulipai.luacompose.compose.material3.surface.registerSurfaceComponents(map)
-
-        return map
+        // Components are now automatically registered by Material3GeneratedPlugin via KSP.
+        // We only use this plugin to inject globals like CardDefaults, MaterialTheme, etc.
+        return emptyMap()
     }
 
     override fun injectGlobals(scriptTable: ScriptTable) {

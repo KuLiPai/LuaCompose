@@ -13,19 +13,19 @@ object FunctionWrappers {
                     func
                 }
                 "kotlin.jvm.functions.Function3" -> {
-                    val func: @Composable (Any?) -> Unit = { p1 -> childScope?.let { ComposeScopeComponent(it, p1) } }
+                    val func: @Composable (Any?) -> Unit = { p1 -> childScope?.let { ComposeScopeComponent(it, p1, ScopeWrappers.wrap(p1)) } }
                     func
                 }
                 "kotlin.jvm.functions.Function4" -> {
-                    val func: @Composable (Any?, Any?) -> Unit = { p1, p2 -> childScope?.let { ComposeScopeComponent(it, p1) } }
+                    val func: @Composable (Any?, Any?) -> Unit = { p1, p2 -> childScope?.let { ComposeScopeComponent(it, p1, ScopeWrappers.wrap(p1), ScopeWrappers.wrap(p2)) } }
                     func
                 }
                 "kotlin.jvm.functions.Function5" -> {
-                    val func: @Composable (Any?, Any?, Any?) -> Unit = { p1, p2, p3 -> childScope?.let { ComposeScopeComponent(it, p1) } }
+                    val func: @Composable (Any?, Any?, Any?) -> Unit = { p1, p2, p3 -> childScope?.let { ComposeScopeComponent(it, p1, ScopeWrappers.wrap(p1), ScopeWrappers.wrap(p2), ScopeWrappers.wrap(p3)) } }
                     func
                 }
                 "kotlin.jvm.functions.Function6" -> {
-                    val func: @Composable (Any?, Any?, Any?, Any?) -> Unit = { p1, p2, p3, p4 -> childScope?.let { ComposeScopeComponent(it, p1) } }
+                    val func: @Composable (Any?, Any?, Any?, Any?) -> Unit = { p1, p2, p3, p4 -> childScope?.let { ComposeScopeComponent(it, p1, ScopeWrappers.wrap(p1), ScopeWrappers.wrap(p2), ScopeWrappers.wrap(p3), ScopeWrappers.wrap(p4)) } }
                     func
                 }
                 else -> {
@@ -41,15 +41,15 @@ object FunctionWrappers {
                 }
                 "kotlin.jvm.functions.Function1" -> {
                     val func: (Any?) -> Unit = { p1 -> 
-                        scriptFunction?.call(ComposeBridge.engine.coerceJavaToScript(p1))
+                        scriptFunction?.call(ScopeWrappers.wrap(p1))
                     }
                     func
                 }
                 "kotlin.jvm.functions.Function2" -> {
                     val func: (Any?, Any?) -> Unit = { p1, p2 -> 
                         scriptFunction?.call(
-                            ComposeBridge.engine.coerceJavaToScript(p1),
-                            ComposeBridge.engine.coerceJavaToScript(p2)
+                            ScopeWrappers.wrap(p1),
+                            ScopeWrappers.wrap(p2)
                         )
                     }
                     func
@@ -57,9 +57,9 @@ object FunctionWrappers {
                 "kotlin.jvm.functions.Function3" -> {
                     val func: (Any?, Any?, Any?) -> Unit = { p1, p2, p3 -> 
                         scriptFunction?.call(
-                            ComposeBridge.engine.coerceJavaToScript(p1),
-                            ComposeBridge.engine.coerceJavaToScript(p2),
-                            ComposeBridge.engine.coerceJavaToScript(p3)
+                            ScopeWrappers.wrap(p1),
+                            ScopeWrappers.wrap(p2),
+                            ScopeWrappers.wrap(p3)
                         )
                     }
                     func
@@ -67,10 +67,10 @@ object FunctionWrappers {
                 "kotlin.jvm.functions.Function4" -> {
                     val func: (Any?, Any?, Any?, Any?) -> Unit = { p1, p2, p3, p4 -> 
                         scriptFunction?.call(
-                            ComposeBridge.engine.coerceJavaToScript(p1),
-                            ComposeBridge.engine.coerceJavaToScript(p2),
-                            ComposeBridge.engine.coerceJavaToScript(p3),
-                            ComposeBridge.engine.coerceJavaToScript(p4)
+                            ScopeWrappers.wrap(p1),
+                            ScopeWrappers.wrap(p2),
+                            ScopeWrappers.wrap(p3),
+                            ScopeWrappers.wrap(p4)
                         )
                     }
                     func

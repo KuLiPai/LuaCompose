@@ -86,92 +86,125 @@ class LuaComposeProcessor(
                     .apply {
                         addStatement("val functionCache = mutableMapOf<String, java.lang.reflect.Method>()")
                         addStatement("val map = mutableMapOf<String, @androidx.compose.runtime.Composable (Map<String, Any?>, com.kulipai.luacompose.compose.runtime.ComposeScope?) -> Unit>()")
-                        for (func in composableFunctions) {
-                            val funcName = func.simpleName.asString()
-                            val fileName = func.containingFile?.fileName ?: ""
-                            val jvmClassName = if (fileName.endsWith(".kt")) fileName.replace(".kt", "Kt") else "${funcName}Kt"
-                            val fullClassName = "$packageName.$jvmClassName"
-                            
-                            val numParams = func.parameters.size
-                            val firstParamName = func.parameters.firstOrNull()?.type?.resolve()?.declaration?.simpleName?.asString()
-                            val firstParamCheck = if (firstParamName != null) {
-                                "it.parameterTypes.getOrNull(0)?.simpleName == \"$firstParamName\""
-                            } else { "true" }
-                            
+                        val grouped = composableFunctions.groupBy { it.simpleName.asString() }
+                        for ((funcName, overloads) in grouped) {
+                            val sortedOverloads = overloads.sortedByDescending { it.parameters.count { p -> !p.hasDefault } }
                             val codeBlock = StringBuilder()
-                            codeBlock.append("""
-                            |map["$funcName"] = { props, childScope ->
-                            |    val method = functionCache.getOrPut("$funcName") {
-                            |        Class.forName("$fullClassName").declaredMethods.first { 
-                            |            (it.name == "$funcName" || it.name.startsWith("$funcName-") || it.name.startsWith("${funcName}_")) && 
-                            |            it.parameterTypes.any { pt -> pt.name == "androidx.compose.runtime.Composer" } &&
-                            |            $firstParamCheck
-                            |        }
-                            |    }
-                            |    val composer = androidx.compose.runtime.currentComposer
-                            |    val args = arrayOfNulls<Any>(method.parameterTypes.size)
-                            |    val composerIndex = method.parameterTypes.indexOfFirst { it.name == "androidx.compose.runtime.Composer" }
-                            |    args[composerIndex] = composer
-                            |    
-                            |    val defaultBitmasks = IntArray(10) // generous size
-                            |    val realParams = $numParams
-                            |
-                            """.trimMargin())
-
-                            for ((i, param) in func.parameters.withIndex()) {
-                                val pName = param.name?.asString()
-                                val isComposable = param.annotations.any { it.shortName.asString() == "Composable" }
-                                codeBlock.append("""
-                            |    val val_$pName = props["$pName"]
-                            |    if (val_$pName is com.kulipai.luacompose.compose.script.ScriptFunction && method.parameterTypes[$i].name.startsWith("kotlin.jvm.functions.Function")) {
-                            |        val scopeToUse = if ($isComposable) com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()?.getOrCreateChildScope(val_$pName) else null
-                            |        args[$i] = com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(scopeToUse, val_$pName, method.parameterTypes[$i].name, $isComposable)
-                            |    } else if (props.containsKey("$pName")) {
-                            |        args[$i] = com.kulipai.luacompose.compose.TypeResolver.resolve(val_$pName, method.parameterTypes[$i])
-                            |    } else if ("$pName" == "content" && childScope != null) {
-                            |        args[$i] = com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(childScope, null, method.parameterTypes[$i].name, true)
-                            |    } else {
-                            |        val defaultMaskIndex = $i / 31
-                            |        defaultBitmasks[defaultMaskIndex] = defaultBitmasks[defaultMaskIndex] or (1 shl ($i % 31))
-                            |        args[$i] = when (method.parameterTypes[$i]) {
-                            |            Boolean::class.javaPrimitiveType -> false
-                            |            Int::class.javaPrimitiveType -> 0
-                            |            Float::class.javaPrimitiveType -> 0f
-                            |            Long::class.javaPrimitiveType -> 0L
-                            |            Double::class.javaPrimitiveType -> 0.0
-                            |            Short::class.javaPrimitiveType -> 0.toShort()
-                            |            Byte::class.javaPrimitiveType -> 0.toByte()
-                            |            Char::class.javaPrimitiveType -> '\u0000'
-                            |            else -> null
-                            |        }
-                            |    }
-                            """.trimMargin() + "\n")
-                            }
-
-                            codeBlock.append("""
-                            |    val defaultParamsCount = Math.ceil(realParams / 31.0).toInt()
-                            |    val intIndices = mutableListOf<Int>()
-                            |    for (i in realParams until method.parameterTypes.size) {
-                            |        if (i != composerIndex && method.parameterTypes[i] == Int::class.javaPrimitiveType) {
-                            |            intIndices.add(i)
-                            |        }
-                            |    }
-                            |    val actualDefaultCount = Math.min(defaultParamsCount, intIndices.size)
-                            |    val defaultIndices = intIndices.takeLast(actualDefaultCount)
-                            |    val changedIndices = intIndices.dropLast(actualDefaultCount)
-                            |    
-                            |    for (idx in changedIndices) {
-                            |        args[idx] = 0
-                            |    }
-                            |    for ((i, idx) in defaultIndices.withIndex()) {
-                            |        args[idx] = defaultBitmasks[i]
-                            |    }
-                            |    
-                            |    method.isAccessible = true
-                            |    method.invoke(null, *args)
-                            |}
-                            """.trimMargin())
+                            codeBlock.append("map[\"$funcName\"] = { props, childScope ->\n")
                             
+                            for ((idx, func) in sortedOverloads.withIndex()) {
+                                var fullClassName = resolver.getOwnerJvmClassName(func)?.replace('/', '.')
+                                if (fullClassName == null) {
+                                    val fileName = func.containingFile?.fileName ?: ""
+                                    val jvmClassName = if (fileName.endsWith(".kt")) fileName.replace(".kt", "Kt") else "${funcName}Kt"
+                                    fullClassName = "$packageName.$jvmClassName"
+                                }
+                                
+                                val numParams = func.parameters.size
+                                val firstParamName = func.parameters.firstOrNull()?.type?.resolve()?.declaration?.simpleName?.asString()
+                                val firstParamCheck = if (firstParamName != null) {
+                                    "it.parameterTypes.getOrNull(0)?.simpleName == \"$firstParamName\""
+                                } else { "true" }
+                                
+                                val requiredNames = func.parameters.filter { !it.hasDefault && it.name?.asString() != "content" }.map { it.name?.asString() ?: "" }
+                                val requiresContent = func.parameters.any { !it.hasDefault && it.name?.asString() == "content" }
+                                
+                                val conditions = mutableListOf<String>()
+                                for (req in requiredNames) {
+                                    conditions.add("props.containsKey(\"$req\")")
+                                }
+                                if (requiresContent) {
+                                    conditions.add("(props.containsKey(\"content\") || childScope != null)")
+                                }
+                                val condition = if (conditions.isEmpty()) "true" else conditions.joinToString(" && ")
+                                
+                                if (idx > 0) codeBlock.append(" else ")
+                                codeBlock.append("if ($condition) {\n")
+                                
+                                codeBlock.append("""
+                                |    val method = functionCache.getOrPut("$funcName-$idx") {
+                                |        Class.forName("$fullClassName").declaredMethods.first { 
+                                |            (it.name == "$funcName" || it.name.startsWith("$funcName-") || it.name.startsWith("${funcName}_")) && 
+                                |            it.parameterTypes.indexOfFirst { pt -> pt.name == "androidx.compose.runtime.Composer" } == $numParams &&
+                                |            $firstParamCheck
+                                |        }
+                                |    }
+                                |    val composer = androidx.compose.runtime.currentComposer
+                                |    val args = arrayOfNulls<Any>(method.parameterTypes.size)
+                                |    val composerIndex = method.parameterTypes.indexOfFirst { it.name == "androidx.compose.runtime.Composer" }
+                                |    args[composerIndex] = composer
+                                |    
+                                |    val defaultBitmasks = IntArray(10) // generous size
+                                |    val realParams = $numParams
+                                |
+                                """.trimMargin())
+                                
+                                for ((i, param) in func.parameters.withIndex()) {
+                                    val pName = param.name?.asString()
+                                    val isComposable = param.annotations.any { it.shortName.asString() == "Composable" } || param.type.annotations.any { it.shortName.asString() == "Composable" } || param.type.resolve().annotations.any { it.shortName.asString() == "Composable" }
+                                    val paramKotlinType = param.type.resolve().declaration.qualifiedName?.asString()
+                                    val resolveCall = when (paramKotlinType) {
+                                        "androidx.compose.ui.unit.TextUnit" -> "com.kulipai.luacompose.compose.TypeResolver.resolve(com.kulipai.luacompose.compose.ui.resolveSp(val_$pName), method.parameterTypes[$i])"
+                                        "androidx.compose.ui.unit.Dp" -> "com.kulipai.luacompose.compose.TypeResolver.resolve(com.kulipai.luacompose.compose.ui.resolveDp(val_$pName), method.parameterTypes[$i])"
+                                        "androidx.compose.ui.graphics.Color" -> "com.kulipai.luacompose.compose.TypeResolver.resolve(com.kulipai.luacompose.compose.ui.resolveColor(val_$pName, androidx.compose.ui.graphics.Color.Unspecified), method.parameterTypes[$i])"
+                                        else -> "com.kulipai.luacompose.compose.TypeResolver.resolve(val_$pName, method.parameterTypes[$i])"
+                                    }
+                                    codeBlock.append("""
+                                |    val val_$pName = props["$pName"]
+                                |    if (val_$pName is com.kulipai.luacompose.compose.script.ScriptFunction && method.parameterTypes[$i].name.startsWith("kotlin.jvm.functions.Function")) {
+                                |        val scopeToUse = if ($isComposable) com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()?.getOrCreateChildScope(val_$pName) else null
+                                |        args[$i] = com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(scopeToUse, val_$pName, method.parameterTypes[$i].name, $isComposable)
+                                |    } else if (props.containsKey("$pName")) {
+                                |        args[$i] = $resolveCall
+                                |    } else if ("$pName" == "content" && childScope != null) {
+                                |        args[$i] = com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(childScope, null, method.parameterTypes[$i].name, true)
+                                |    } else {
+                                |        val defaultMaskIndex = $i / 31
+                                |        defaultBitmasks[defaultMaskIndex] = defaultBitmasks[defaultMaskIndex] or (1 shl ($i % 31))
+                                |        args[$i] = when (method.parameterTypes[$i]) {
+                                |            Boolean::class.javaPrimitiveType -> false
+                                |            Int::class.javaPrimitiveType -> 0
+                                |            Float::class.javaPrimitiveType -> 0f
+                                |            Long::class.javaPrimitiveType -> 0L
+                                |            Double::class.javaPrimitiveType -> 0.0
+                                |            Short::class.javaPrimitiveType -> 0.toShort()
+                                |            Byte::class.javaPrimitiveType -> 0.toByte()
+                                |            Char::class.javaPrimitiveType -> '\u0000'
+                                |            else -> null
+                                |        }
+                                |    }
+                                """.trimMargin() + "\n")
+                                }
+                                
+                                codeBlock.append("""
+                                |    val defaultParamsCount = Math.ceil(realParams / 31.0).toInt()
+                                |    val intIndices = mutableListOf<Int>()
+                                |    for (i in realParams until method.parameterTypes.size) {
+                                |        if (i != composerIndex && method.parameterTypes[i] == Int::class.javaPrimitiveType) {
+                                |            intIndices.add(i)
+                                |        }
+                                |    }
+                                |    val actualDefaultCount = Math.min(defaultParamsCount, intIndices.size)
+                                |    val defaultIndices = intIndices.takeLast(actualDefaultCount)
+                                |    val changedIndices = intIndices.dropLast(actualDefaultCount)
+                                |    
+                                |    for (idx in changedIndices) {
+                                |        args[idx] = 0
+                                |    }
+                                |    for ((i, idx) in defaultIndices.withIndex()) {
+                                |        args[idx] = defaultBitmasks[i]
+                                |    }
+                                |    
+                                |    method.isAccessible = true
+                                |    try {
+                                |        method.invoke(null, *args)
+                                |    } catch (e: Exception) {
+                                |        android.util.Log.e("LuaCompose", "Error invoking ${"$funcName"}: ${"$"}{e.message}", e)
+                                |    }
+                                |}
+                                """.trimMargin())
+                            }
+                            codeBlock.append("\n}\n")
                             addCode("%L\n", codeBlock.toString())
                         }
                         addStatement("return map")

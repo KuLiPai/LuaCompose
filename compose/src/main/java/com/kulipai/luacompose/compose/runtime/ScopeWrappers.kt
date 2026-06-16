@@ -27,6 +27,6 @@ object ScopeWrappers {
             table.setMetatable(meta)
             return table
         }
-        return ComposeBridge.engine.coerceJavaToScript(obj)
+        return ComposeBridge.javaToScript(obj)
     }
 }

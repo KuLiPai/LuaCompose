@@ -30,39 +30,27 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
 
     override fun injectGlobals(scriptTable: ScriptTable) {
         // -------------- Path ------------------
-        val pathMethods = ComposeBridge.engine.createTable()
-        pathMethods.set("moveTo", ComposeBridge.engine.createFunction { args ->
-            val self = args[0].asTable()
-            val path = self.get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
-            path.moveTo(args[1].toFloat(), args[2].toFloat())
-            self
-        })
-        pathMethods.set("lineTo", ComposeBridge.engine.createFunction { args ->
-            val self = args[0].asTable()
-            val path = self.get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
-            path.lineTo(args[1].toFloat(), args[2].toFloat())
-            self
-        })
-        pathMethods.set("close", ComposeBridge.engine.createFunction { args ->
-            val self = args[0].asTable()
-            val path = self.get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
-            path.close()
-            self
-        })
-
         ComposeBridge.converters[androidx.compose.ui.graphics.Path::class.java] = { obj ->
             val path = obj as androidx.compose.ui.graphics.Path
             val instance = ComposeBridge.engine.createTable()
             instance.set("_javaPath", ComposeBridge.engine.createUserdata(path))
             
-            val newMeta = ComposeBridge.engine.createTable()
-            newMeta.set("__index", ComposeBridge.engine.createFunction { innerArgs ->
-                val key = innerArgs[1]
-                val custom = pathMethods.get(key)
-                if (!custom.isNil()) return@createFunction custom
-                ComposeBridge.engine.createNil()
+            instance.set("moveTo", ComposeBridge.engine.createFunction { innerArgs ->
+                val startIdx = if (innerArgs.size > 0 && innerArgs[0].isTable() && !innerArgs[0].asTable().get("_javaPath").isNil()) 1 else 0
+                path.moveTo(innerArgs[startIdx].toFloat(), innerArgs[startIdx + 1].toFloat())
+                instance
             })
-            instance.setMetatable(newMeta)
+            
+            instance.set("lineTo", ComposeBridge.engine.createFunction { innerArgs ->
+                val startIdx = if (innerArgs.size > 0 && innerArgs[0].isTable() && !innerArgs[0].asTable().get("_javaPath").isNil()) 1 else 0
+                path.lineTo(innerArgs[startIdx].toFloat(), innerArgs[startIdx + 1].toFloat())
+                instance
+            })
+            
+            instance.set("close", ComposeBridge.engine.createFunction { innerArgs ->
+                path.close()
+                instance
+            })
             instance
         }
 
@@ -75,28 +63,16 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
         pathCompanionTable.setMetatable(pathTableMeta)
         scriptTable.set("Path", pathCompanionTable)
         // -------------- Color ------------------
-                val colorMethods = ComposeBridge.engine.createTable()
-                colorMethods.set("luminance", ComposeBridge.engine.createFunction { args ->
-                    val self = args[0]
-                    val colorJava = self.asTable().get("_javaColor").asUserdata() as Color
-                    ComposeBridge.javaToScript(colorJava.luminance())
-                })
-
-                ComposeBridge.converters[Color::class.java] = { obj ->
-                    val color = obj as Color
-                    val instance = ComposeBridge.engine.createTable()
-                    instance.set("_javaColor", ComposeBridge.engine.createUserdata(color))
-                    
-                    val newMeta = ComposeBridge.engine.createTable()
-                    newMeta.set("__index", ComposeBridge.engine.createFunction { innerArgs ->
-                        val key = innerArgs[1]
-                        val custom = colorMethods.get(key)
-                        if (!custom.isNil()) return@createFunction custom
-                        ComposeBridge.engine.createNil()
-                    })
-                    instance.setMetatable(newMeta)
-                    instance
-                }
+        ComposeBridge.converters[Color::class.java] = { obj ->
+            val color = obj as Color
+            val instance = ComposeBridge.engine.createTable()
+            instance.set("_javaColor", ComposeBridge.engine.createUserdata(color))
+            
+            instance.set("luminance", ComposeBridge.engine.createFunction { innerArgs ->
+                ComposeBridge.javaToScript(color.luminance())
+            })
+            instance
+        }
 
                 val colorCompanionTable = ComposeBridge.engine.createTable()
                 colorCompanionTable.set("Black", ComposeBridge.javaToScript(Color.Black))

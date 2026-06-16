@@ -233,6 +233,10 @@ object LuaComposeRegistry {
         registerPlugin(com.kulipai.luacompose.compose.animation.core.AnimationCorePlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.geometry.UiGeometryPlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.unit.UiUnitPlugin())
+
+        com.kulipai.luacompose.compose.runtime.ComposeBridge.converters[androidx.compose.ui.graphics.drawscope.DrawScope::class.java] = { scope ->
+            createComposeDrawScope(scope as androidx.compose.ui.graphics.drawscope.DrawScope) 
+        }
     }
 
     fun registerPlugin(plugin: ComposeScriptPlugin) {

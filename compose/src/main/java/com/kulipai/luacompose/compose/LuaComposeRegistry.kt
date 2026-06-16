@@ -107,12 +107,20 @@ fun createComposeDrawScope(drawScope: DrawScope): ScriptTable {
         val mapArgs = args[0].asTable()
         val color = resolveColor(ComposeBridge.scriptToJava(mapArgs.get("color")))
         val radiusVal = mapArgs.get("radius")
+        val centerVal = mapArgs.get("center")
         val cxVal = mapArgs.get("centerX")
         val cyVal = mapArgs.get("centerY")
         
         val radius = if (!radiusVal.isNil()) radiusVal.toFloat() else 50f
-        val centerX = if (!cxVal.isNil()) cxVal.toFloat() else drawScope.center.x
-        val centerY = if (!cyVal.isNil()) cyVal.toFloat() else drawScope.center.y
+        
+        var centerX = if (!cxVal.isNil()) cxVal.toFloat() else drawScope.center.x
+        var centerY = if (!cyVal.isNil()) cyVal.toFloat() else drawScope.center.y
+        
+        if (centerVal != null && !centerVal.isNil()) {
+            val offset = centerVal.asTable().get("_javaOffset").asUserdata() as Offset
+            centerX = offset.x
+            centerY = offset.y
+        }
         
         drawScope.drawCircle(
             color = color,
@@ -128,10 +136,11 @@ fun createComposeDrawScope(drawScope: DrawScope): ScriptTable {
         val scriptPath = mapArgs.get("path")
         
         if (scriptPath.isTable()) {
-            val pathData = scriptPath.asTable().get("path")
-            if (pathData.isUserdata() && pathData.asUserdata() is Path) {
+            val pathData = scriptPath.asTable().get("_javaPath")
+            if (!pathData.isNil() && pathData.isUserdata()) {
+                val path = pathData.asUserdata() as androidx.compose.ui.graphics.Path
                 drawScope.drawPath(
-                    path = pathData.asUserdata() as Path,
+                    path = path,
                     color = color
                 )
             }

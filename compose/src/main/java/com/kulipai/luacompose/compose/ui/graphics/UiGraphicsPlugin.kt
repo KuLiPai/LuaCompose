@@ -29,6 +29,51 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
     }
 
     override fun injectGlobals(scriptTable: ScriptTable) {
+        // -------------- Path ------------------
+        val pathMethods = ComposeBridge.engine.createTable()
+        pathMethods.set("moveTo", ComposeBridge.engine.createFunction { args ->
+            val self = args[0].asTable()
+            val path = self.get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
+            path.moveTo(args[1].toFloat(), args[2].toFloat())
+            self
+        })
+        pathMethods.set("lineTo", ComposeBridge.engine.createFunction { args ->
+            val self = args[0].asTable()
+            val path = self.get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
+            path.lineTo(args[1].toFloat(), args[2].toFloat())
+            self
+        })
+        pathMethods.set("close", ComposeBridge.engine.createFunction { args ->
+            val self = args[0].asTable()
+            val path = self.get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
+            path.close()
+            self
+        })
+
+        ComposeBridge.converters[androidx.compose.ui.graphics.Path::class.java] = { obj ->
+            val path = obj as androidx.compose.ui.graphics.Path
+            val instance = ComposeBridge.engine.createTable()
+            instance.set("_javaPath", ComposeBridge.engine.createUserdata(path))
+            
+            val newMeta = ComposeBridge.engine.createTable()
+            newMeta.set("__index", ComposeBridge.engine.createFunction { innerArgs ->
+                val key = innerArgs[1]
+                val custom = pathMethods.get(key)
+                if (!custom.isNil()) return@createFunction custom
+                ComposeBridge.engine.createNil()
+            })
+            instance.setMetatable(newMeta)
+            instance
+        }
+
+        val pathCompanionTable = ComposeBridge.engine.createTable()
+        val pathTableMeta = ComposeBridge.engine.createTable()
+        pathTableMeta.set("__call", ComposeBridge.engine.createFunction { args ->
+            val path = androidx.compose.ui.graphics.Path()
+            ComposeBridge.javaToScript(path)
+        })
+        pathCompanionTable.setMetatable(pathTableMeta)
+        scriptTable.set("Path", pathCompanionTable)
         // -------------- Color ------------------
                 val colorMethods = ComposeBridge.engine.createTable()
                 colorMethods.set("luminance", ComposeBridge.engine.createFunction { args ->

@@ -347,6 +347,15 @@ object LuaComposeLib {
                     ComposeBridge.engine.createNil()
                 }
                 targetTable.set(componentName, func)
+
+                if (plugin is com.kulipai.luacompose.compose.foundation.FoundationPlugin) {
+                    var foundationTable = composeTable.get("foundation")
+                    if (foundationTable.isNil()) {
+                        foundationTable = ComposeBridge.engine.createTable()
+                        composeTable.set("foundation", foundationTable)
+                    }
+                    foundationTable.asTable().set(componentName, func)
+                }
             }
         }
 

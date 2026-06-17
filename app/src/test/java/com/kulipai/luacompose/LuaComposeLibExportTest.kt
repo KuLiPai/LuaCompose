@@ -25,6 +25,7 @@ class LuaComposeLibExportTest {
         val layout = foundation.get("layout").asTable()
         val material3 = compose.get("material3").asTable()
 
+        assertTrue(foundation.get("Canvas").isFunction())
         assertTrue(layout.get("Column").isFunction())
         assertTrue(layout.get("Row").isFunction())
         assertTrue(material3.get("Text").isFunction())
@@ -80,6 +81,33 @@ class LuaComposeLibExportTest {
             local compose = compose
             local Column = compose.foundation.layout.Column
             return Column ~= nil
+            """.trimIndent(),
+            "main.lua"
+        ).call()
+
+        assertEquals(true, result.toboolean())
+    }
+
+    @Test
+    fun luaScriptCanReadFoundationCanvas() {
+        val globals = JsePlatform.standardGlobals()
+        ComposeBridge.engine = LuajEngine
+        ComposeBridge.luaValueUnwrapper = { value ->
+            if (value is org.luaj.LuaValue) {
+                ComposeBridge.scriptToJava(LuajEngine.wrap(value))
+            } else {
+                value
+            }
+        }
+
+        val env = LuajEngine.wrap(globals).asTable()
+        LuaComposeLib.inject(env)
+
+        val result = globals.load(
+            """
+            local compose = compose
+            local Canvas = compose.foundation.Canvas
+            return Canvas ~= nil
             """.trimIndent(),
             "main.lua"
         ).call()

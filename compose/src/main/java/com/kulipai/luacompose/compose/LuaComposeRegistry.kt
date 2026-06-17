@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.withTransform
+import com.kulipai.luacompose.generated.GeneratedPluginRegistry
 import com.kulipai.luacompose.compose.animation.AnimationPlugin
 import com.kulipai.luacompose.compose.foundation.FoundationPlugin
 import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
@@ -224,12 +225,10 @@ object LuaComposeRegistry {
     val plugins = mutableListOf<ComposeScriptPlugin>()
 
     init {
-        registerGeneratedPlugin("com.kulipai.luacompose.generated.FoundationGeneratedPlugin")
-        registerGeneratedPlugin("com.kulipai.luacompose.generated.FoundationLayoutGeneratedPlugin")
+        GeneratedPluginRegistry.registerAll(::registerPlugin)
         registerPlugin(com.kulipai.luacompose.compose.foundation.FoundationPlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.graphics.UiGraphicsPlugin())
         registerPlugin(com.kulipai.luacompose.compose.material3.Material3Plugin())
-        registerGeneratedPlugin("com.kulipai.luacompose.generated.Material3GeneratedPlugin")
         registerPlugin(AnimationPlugin())
         registerPlugin(com.kulipai.luacompose.compose.animation.core.AnimationCorePlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.geometry.UiGeometryPlugin())
@@ -238,18 +237,6 @@ object LuaComposeRegistry {
         com.kulipai.luacompose.compose.runtime.ComposeBridge.converters[androidx.compose.ui.graphics.drawscope.DrawScope::class.java] = { scope ->
             createComposeDrawScope(scope as androidx.compose.ui.graphics.drawscope.DrawScope) 
         }
-    }
-
-    private fun registerGeneratedPlugin(className: String) {
-        val pluginClass = runCatching { Class.forName(className) }.onFailure {
-            Log.e("LUA_PLUGIN", "Failed to load generated plugin: $className", it)
-        }.getOrNull() ?: return
-        val plugin = runCatching {
-            pluginClass.getDeclaredConstructor().newInstance() as ComposeScriptPlugin
-        }.onFailure {
-            Log.e("LUA_PLUGIN", "Failed to instantiate generated plugin: $className", it)
-        }.getOrNull() ?: return
-        registerPlugin(plugin)
     }
 
     fun registerPlugin(plugin: ComposeScriptPlugin) {

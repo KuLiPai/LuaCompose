@@ -12,6 +12,8 @@ class LuaComposeProcessor(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger
 ) : SymbolProcessor {
+    private val generatedPluginClassNames = linkedSetOf<String>()
+    private var registryGenerated = false
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val packageSymbols = resolver.getSymbolsWithAnnotation("com.kulipai.luacompose.annotations.LuaBridgePackage")
@@ -31,6 +33,11 @@ class LuaComposeProcessor(
                 
                 generateBridgeForPackage(resolver, packageName, category)
             }
+        }
+
+        if (!registryGenerated && generatedPluginClassNames.isNotEmpty()) {
+            generatePluginRegistry()
+            registryGenerated = true
         }
         
         return emptyList()
@@ -57,6 +64,7 @@ class LuaComposeProcessor(
 
         val categorySafe = category.split('.').joinToString("") { it.replaceFirstChar { c -> c.uppercase() } }
         val pluginClassName = categorySafe + "GeneratedPlugin"
+        generatedPluginClassNames += pluginClassName
         
         val compNames = mutableListOf<String>()
         val grouped = composableFunctions.groupBy { it.simpleName.asString() }
@@ -252,5 +260,32 @@ class LuaComposeProcessor(
             .addType(pluginTypeSpec)
             .build()
         pluginFileSpec.writeTo(codeGenerator, Dependencies(true))
+    }
+
+    private fun generatePluginRegistry() {
+        val composeScriptPlugin = ClassName("com.kulipai.luacompose.compose.runtime", "ComposeScriptPlugin")
+        val registerFunctionType = LambdaTypeName.get(
+            parameters = arrayOf(ParameterSpec.unnamed(composeScriptPlugin)),
+            returnType = UNIT
+        )
+
+        val registryTypeSpec = TypeSpec.objectBuilder("GeneratedPluginRegistry")
+            .addFunction(
+                FunSpec.builder("registerAll")
+                    .addParameter("register", registerFunctionType)
+                    .apply {
+                        for (pluginClassName in generatedPluginClassNames) {
+                            addStatement("register(%L())", pluginClassName)
+                        }
+                    }
+                    .build()
+            )
+            .build()
+
+        val registryFileSpec = FileSpec.builder("com.kulipai.luacompose.generated", "GeneratedPluginRegistry")
+            .addType(registryTypeSpec)
+            .build()
+
+        registryFileSpec.writeTo(codeGenerator, Dependencies(true))
     }
 }

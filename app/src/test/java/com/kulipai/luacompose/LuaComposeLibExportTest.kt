@@ -15,6 +15,15 @@ import org.luaj.lib.jse.JsePlatform
 
 class LuaComposeLibExportTest {
     @Test
+    fun generatedPluginRegistryClassIsLoadable() {
+        assertTrue(
+            runCatching {
+                Class.forName("com.kulipai.luacompose.generated.GeneratedPluginRegistry")
+            }.isSuccess
+        )
+    }
+
+    @Test
     fun generatedFoundationPluginClassIsLoadable() {
         assertTrue(
             runCatching {

@@ -155,8 +155,13 @@ internal fun registerTransitionComponents(): Map<String, @Composable (props: Map
                 label = props["label"] as? String ?: "AnimatedContent"
             ) { stateValue ->
                 if (actualChildScope != null) {
+                    val branchKey = listOf("AnimatedContentBranch", stateValue ?: "__nil__")
+                    val branchScope = actualChildScope.getOrCreateChildScope(
+                        actualChildScope.contentFunc,
+                        branchKey
+                    )
                     ComposeScopeComponent(
-                        actualChildScope,
+                        branchScope,
                         this,
                         ComposeBridge.javaToScript(this),
                         ComposeBridge.javaToScript(stateValue)

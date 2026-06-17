@@ -33,6 +33,14 @@ android {
     buildFeatures {
         compose = true
     }
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+            all {
+                it.jvmArgs("-Xverify:none")
+            }
+        }
+    }
 }
 
 dependencies {
@@ -52,4 +60,7 @@ dependencies {
     implementation(project(":androlua"))
 
     implementation(project(":compose"))
+
+    testImplementation(kotlin("reflect"))
+    testImplementation("junit:junit:4.13.2")
 }

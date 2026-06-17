@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import com.kulipai.luacompose.compose.animation.AnimationPlugin
 import com.kulipai.luacompose.compose.foundation.FoundationPlugin
+import com.kulipai.luacompose.compose.foundation.layout.FoundationLayoutPlugin
 import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
 import com.kulipai.luacompose.compose.material3.Material3Plugin
 import com.kulipai.luacompose.compose.runtime.ComposeScope
@@ -223,12 +224,13 @@ object LuaComposeRegistry {
     val plugins = mutableListOf<ComposeScriptPlugin>()
 
     init {
-        registerPlugin(com.kulipai.luacompose.generated.FoundationGeneratedPlugin())
-        registerPlugin(com.kulipai.luacompose.generated.FoundationLayoutGeneratedPlugin())
+        registerPlugin(FoundationLayoutPlugin())
+        registerGeneratedPlugin("com.kulipai.luacompose.generated.FoundationGeneratedPlugin")
+        registerGeneratedPlugin("com.kulipai.luacompose.generated.FoundationLayoutGeneratedPlugin")
         registerPlugin(com.kulipai.luacompose.compose.foundation.FoundationPlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.graphics.UiGraphicsPlugin())
-        registerPlugin(com.kulipai.luacompose.generated.Material3GeneratedPlugin())
         registerPlugin(com.kulipai.luacompose.compose.material3.Material3Plugin())
+        registerGeneratedPlugin("com.kulipai.luacompose.generated.Material3GeneratedPlugin")
         registerPlugin(AnimationPlugin())
         registerPlugin(com.kulipai.luacompose.compose.animation.core.AnimationCorePlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.geometry.UiGeometryPlugin())
@@ -237,6 +239,14 @@ object LuaComposeRegistry {
         com.kulipai.luacompose.compose.runtime.ComposeBridge.converters[androidx.compose.ui.graphics.drawscope.DrawScope::class.java] = { scope ->
             createComposeDrawScope(scope as androidx.compose.ui.graphics.drawscope.DrawScope) 
         }
+    }
+
+    private fun registerGeneratedPlugin(className: String) {
+        val pluginClass = runCatching { Class.forName(className) }.getOrNull() ?: return
+        val plugin = runCatching {
+            pluginClass.getDeclaredConstructor().newInstance() as ComposeScriptPlugin
+        }.getOrNull() ?: return
+        registerPlugin(plugin)
     }
 
     fun registerPlugin(plugin: ComposeScriptPlugin) {

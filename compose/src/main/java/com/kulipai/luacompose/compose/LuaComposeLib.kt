@@ -28,7 +28,13 @@ object LuaComposeLib {
     var rootContentFunc: ScriptFunction? = null
     var globalEnv: ScriptTable? = null
 
+    fun clearRuntimeState() {
+        rootContentFunc = null
+        globalEnv = null
+    }
+
     fun inject(env: ScriptTable): ScriptTable {
+        clearRuntimeState()
         globalEnv = env
         val composeTable = ComposeBridge.engine.createTable()
         env.set("compose", composeTable)

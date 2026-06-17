@@ -22,6 +22,17 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.kulipai.luacompose.compose.material3.button.registerButtonComponents
+import com.kulipai.luacompose.compose.material3.card.registerCardComponents
+import com.kulipai.luacompose.compose.material3.checkbox.registerCheckboxComponents
+import com.kulipai.luacompose.compose.material3.divider.registerDividerComponents
+import com.kulipai.luacompose.compose.material3.icon.registerIconComponents
+import com.kulipai.luacompose.compose.material3.progressindicator.registerProgressindicatorComponents
+import com.kulipai.luacompose.compose.material3.radiobutton.registerRadiobuttonComponents
+import com.kulipai.luacompose.compose.material3.surface.registerSurfaceComponents
+import com.kulipai.luacompose.compose.material3.switch.registerSwitchComponents
+import com.kulipai.luacompose.compose.material3.text.registerTextComponents
+import com.kulipai.luacompose.compose.material3.textfield.registerTextfieldComponents
 import com.kulipai.luacompose.compose.runtime.ComposeBridge
 import com.kulipai.luacompose.compose.runtime.ComposeScope
 import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
@@ -31,9 +42,20 @@ class Material3Plugin : ComposeScriptPlugin {
     override val namespace: String? = "material3"
 
     override fun getComponents(): Map<String, @Composable (props: Map<String, Any?>, childScope: ComposeScope?) -> Unit> {
-        // Components are now automatically registered by Material3GeneratedPlugin via KSP.
-        // We only use this plugin to inject globals like CardDefaults, MaterialTheme, etc.
-        return emptyMap()
+        val map =
+            mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: ComposeScope?) -> Unit>()
+        registerButtonComponents(map)
+        registerCardComponents(map)
+        registerCheckboxComponents(map)
+        registerDividerComponents(map)
+        registerIconComponents(map)
+        registerProgressindicatorComponents(map)
+        registerRadiobuttonComponents(map)
+        registerSurfaceComponents(map)
+        registerSwitchComponents(map)
+        registerTextComponents(map)
+        registerTextfieldComponents(map)
+        return map
     }
 
     override fun injectGlobals(scriptTable: ScriptTable) {

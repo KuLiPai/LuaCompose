@@ -111,37 +111,38 @@ fun LuaAppRunner(context: Context) {
 
 // 动态读取并加载 Lua 执行环境
 fun loadLuaScope(context: Context): ComposeScope {
-    // 1. 初始化 luaj++ 虚拟机环境
-    val globals: Globals = JsePlatform.standardGlobals()
+    try {
+        // 1. 初始化 luaj++ 虚拟机环境
+        val globals: Globals = JsePlatform.standardGlobals()
 
-    // 2. 初始化 Kotlin 侧实现的 Compose DSL 库
-    ComposeBridge.engine = LuajEngine
-    ComposeBridge.luaValueUnwrapper = { value ->
-        if (value is org.luaj.LuaValue) {
-            ComposeBridge.scriptToJava(LuajEngine.wrap(value))
-        } else value
-    }
-    val env = LuajEngine.wrap(globals).asTable()
-    LuaComposeLib.inject(env)
-
-    // 3. 注册 Modifier 全局对象
-    globals.set("Modifier", object : ZeroArgFunction() {
-        override fun call(): LuaValue {
-            return CoerceJavaToLua.coerce(LuaModifier())
+        // 2. 初始化 Kotlin 侧实现的 Compose DSL 库
+        ComposeBridge.engine = LuajEngine
+        ComposeBridge.luaValueUnwrapper = { value ->
+            if (value is org.luaj.LuaValue) {
+                ComposeBridge.scriptToJava(LuajEngine.wrap(value))
+            } else value
         }
-    })
+        val env = LuajEngine.wrap(globals).asTable()
+        LuaComposeLib.inject(env)
 
-    // 4. 定位外置存储路径 /sdcard/Android/data/<packagename>/files/
-    val externalDir = context.getExternalFilesDir(null)
-        ?: throw RuntimeException("外置存储不可用")
-    if (!externalDir.exists()) {
-        externalDir.mkdirs()
-    }
-    val mainLuaFile = File(externalDir, "main.lua")
+        // 3. 注册 Modifier 全局对象
+        globals.set("Modifier", object : ZeroArgFunction() {
+            override fun call(): LuaValue {
+                return CoerceJavaToLua.coerce(LuaModifier())
+            }
+        })
 
-    // 如果主测试文件不存在，自动写入一个功能完整的示例
-    if (!mainLuaFile.exists()) {
-        val sampleCode = """
+        // 4. 定位外置存储路径 /sdcard/Android/data/<packagename>/files/
+        val externalDir = context.getExternalFilesDir(null)
+            ?: throw RuntimeException("外置存储不可用")
+        if (!externalDir.exists()) {
+            externalDir.mkdirs()
+        }
+        val mainLuaFile = File(externalDir, "main.lua")
+
+        // 如果主测试文件不存在，自动写入一个功能完整的示例
+        if (!mainLuaFile.exists()) {
+            val sampleCode = """
             -- main.lua
             local compose = compose
             local Column = compose.foundation.Column
@@ -209,21 +210,25 @@ fun loadLuaScope(context: Context): ComposeScope {
                 end
               }
             end)
-        """.trimIndent()
-        mainLuaFile.writeText(sampleCode)
+            """.trimIndent()
+            mainLuaFile.writeText(sampleCode)
+        }
+
+        // 5. 加载并运行主 Lua 脚本
+        val scriptContent = mainLuaFile.readText()
+        val userScriptResult = globals.load(scriptContent, "main.lua").call()
+
+        // 6. 优先从 compose.rootContentFunc 读取布局函数，其次从脚本返回值中读取
+        val rootLuaFunction = LuaComposeLib.rootContentFunc
+            ?: (LuajEngine.wrap(userScriptResult).takeIf { it.isFunction() }?.asFunction())
+            ?: throw RuntimeException("请使用 compose.setContent(function) 设置布局，或者在 main.lua 结尾返回布局函数")
+
+        LuaComposeLib.clearRuntimeState()
+
+        // 7. 创建 Kotlin 侧的 ComposeScope
+        return ComposeScope(rootLuaFunction)
+    } catch (e: Exception) {
+        LuaComposeLib.clearRuntimeState()
+        throw e
     }
-
-    // 5. 加载并运行主 Lua 脚本
-    val scriptContent = mainLuaFile.readText()
-    val userScriptResult = globals.load(scriptContent, "main.lua").call()
-
-    // 6. 优先从 compose.rootContentFunc 读取布局函数，其次从脚本返回值中读取
-    val rootLuaFunction = LuaComposeLib.rootContentFunc
-        ?: (LuajEngine.wrap(userScriptResult).takeIf { it.isFunction() }?.asFunction())
-        ?: throw RuntimeException("请使用 compose.setContent(function) 设置布局，或者在 main.lua 结尾返回布局函数")
-
-    // 7. 创建 Kotlin 侧的 ComposeScope
-    val rootScope = ComposeScope(rootLuaFunction)
-
-    return rootScope
 }

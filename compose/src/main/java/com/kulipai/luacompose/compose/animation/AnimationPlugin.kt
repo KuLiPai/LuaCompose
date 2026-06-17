@@ -49,6 +49,44 @@ class AnimationPlugin : ComposeScriptPlugin {
     }
 
     override fun injectGlobals(scriptTable: ScriptTable) {
+        scriptTable.set("rememberSharedContentState", ComposeBridge.engine.createFunction { args ->
+            val scope = ComposeBridge.getActiveSharedTransitionScope()
+                ?: throw RuntimeException("rememberSharedContentState() 必须在 SharedTransitionLayout/SharedTransitionScope 中调用")
+            val activeScope = ComposeBridge.getActiveScope()
+                ?: throw RuntimeException("rememberSharedContentState() 必须在 Compose 上下文中调用")
+
+            val keyArg = args.getOrNull(0) ?: ComposeBridge.engine.createNil()
+            val configArg = args.getOrNull(1) ?: ComposeBridge.engine.createNil()
+            val key = if (keyArg.isTable()) {
+                val table = keyArg.asTable()
+                val namedKey = table.get("key")
+                if (!namedKey.isNil()) ComposeBridge.scriptToJava(namedKey) else ComposeBridge.scriptToJava(table.get(1))
+            } else {
+                ComposeBridge.scriptToJava(keyArg)
+            } ?: "nil"
+
+            val config =
+                if (!configArg.isNil() && configArg.isUserdata() && configArg.asUserdata() is SharedTransitionScope.SharedContentConfig) {
+                    configArg.asUserdata() as SharedTransitionScope.SharedContentConfig
+                } else {
+                    SharedTransitionDefaults.SharedContentConfig
+                }
+
+            val rememberFunc = ComposeBridge.engine.createFunction {
+                val clazz = Class.forName("androidx.compose.animation.SharedTransitionScope\$SharedContentState")
+                val ctor = clazz.declaredConstructors.firstOrNull { constructor ->
+                    val params = constructor.parameterTypes
+                    params.size == 2 && params[0] == Any::class.java && params[1].isAssignableFrom(config::class.java)
+                } ?: clazz.declaredConstructors.first()
+                ctor.isAccessible = true
+                ComposeBridge.javaToScript(ctor.newInstance(key, config))
+            }
+            activeScope.getOrCreateRemember(
+                rememberFunc,
+                listOf("shared-content-state", scope.hashCode(), key, config)
+            )
+        })
+
         // Transitions
 
         // Transitions

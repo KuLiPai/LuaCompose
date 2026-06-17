@@ -71,6 +71,19 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
             instance.set("luminance", ComposeBridge.engine.createFunction { innerArgs ->
                 ComposeBridge.javaToScript(color.luminance())
             })
+            instance.set("copy", ComposeBridge.engine.createFunction { innerArgs ->
+                val startIdx = if (innerArgs.isNotEmpty() && innerArgs[0].isTable() && !innerArgs[0].asTable().get("_javaColor").isNil()) 1 else 0
+                val params = innerArgs.getOrNull(startIdx)
+                val alpha = if (params != null && params.isTable()) {
+                    val alphaVal = params.asTable().get("alpha")
+                    if (!alphaVal.isNil()) alphaVal.toFloat() else color.alpha
+                } else if (params != null && !params.isNil()) {
+                    params.toFloat()
+                } else {
+                    color.alpha
+                }
+                ComposeBridge.javaToScript(color.copy(alpha = alpha))
+            })
             instance
         }
 

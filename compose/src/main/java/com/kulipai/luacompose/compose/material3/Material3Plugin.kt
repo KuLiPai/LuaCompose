@@ -20,43 +20,16 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.kulipai.luacompose.compose.material3.button.registerButtonComponents
-import com.kulipai.luacompose.compose.material3.card.registerCardComponents
-import com.kulipai.luacompose.compose.material3.checkbox.registerCheckboxComponents
-import com.kulipai.luacompose.compose.material3.divider.registerDividerComponents
-import com.kulipai.luacompose.compose.material3.icon.registerIconComponents
-import com.kulipai.luacompose.compose.material3.progressindicator.registerProgressindicatorComponents
-import com.kulipai.luacompose.compose.material3.radiobutton.registerRadiobuttonComponents
-import com.kulipai.luacompose.compose.material3.surface.registerSurfaceComponents
-import com.kulipai.luacompose.compose.material3.switch.registerSwitchComponents
-import com.kulipai.luacompose.compose.material3.text.registerTextComponents
-import com.kulipai.luacompose.compose.material3.textfield.registerTextfieldComponents
 import com.kulipai.luacompose.compose.runtime.ComposeBridge
-import com.kulipai.luacompose.compose.runtime.ComposeScope
 import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
 import com.kulipai.luacompose.compose.script.ScriptTable
 
 class Material3Plugin : ComposeScriptPlugin {
     override val namespace: String? = "material3"
 
-    override fun getComponents(): Map<String, @Composable (props: Map<String, Any?>, childScope: ComposeScope?) -> Unit> {
-        val map =
-            mutableMapOf<String, @Composable (props: Map<String, Any?>, childScope: ComposeScope?) -> Unit>()
-        registerButtonComponents(map)
-        registerCardComponents(map)
-        registerCheckboxComponents(map)
-        registerDividerComponents(map)
-        registerIconComponents(map)
-        registerProgressindicatorComponents(map)
-        registerRadiobuttonComponents(map)
-        registerSurfaceComponents(map)
-        registerSwitchComponents(map)
-        registerTextComponents(map)
-        registerTextfieldComponents(map)
-        return map
-    }
+    override fun getComponents(): Map<String, @androidx.compose.runtime.Composable (props: Map<String, Any?>, childScope: com.kulipai.luacompose.compose.runtime.ComposeScope?) -> Unit> =
+        emptyMap()
 
     override fun injectGlobals(scriptTable: ScriptTable) {
         val cardDefaultsTable = ComposeBridge.engine.createTable()
@@ -169,6 +142,12 @@ class Material3Plugin : ComposeScriptPlugin {
         shapesTable.setMetatable(shapesMeta)
         mtTable.set("shapes", shapesTable)
         mtTable.set("shape", shapesTable) // Alias
+
+        val materialThemeMeta = ComposeBridge.engine.createTable()
+        materialThemeMeta.set("__call", ComposeBridge.engine.createFunction {
+            ComposeBridge.engine.createNil()
+        })
+        mtTable.setMetatable(materialThemeMeta)
 
         scriptTable.set("MaterialTheme", mtTable)
     }

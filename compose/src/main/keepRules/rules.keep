@@ -10,3 +10,6 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+# KSP-generated Compose plugins/components are loaded reflectively from LuaComposeRegistry.
+-keep class com.kulipai.luacompose.generated.**

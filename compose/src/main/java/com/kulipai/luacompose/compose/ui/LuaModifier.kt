@@ -1,6 +1,10 @@
 package com.kulipai.luacompose.compose.ui
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionDefaults
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +30,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
@@ -213,6 +218,50 @@ class LuaModifier(var modifier: Modifier = Modifier) {
 
     fun animateContentSize(): LuaModifier {
         modifier = modifier.animateContentSize()
+        return this
+    }
+
+    @OptIn(ExperimentalSharedTransitionApi::class)
+    fun sharedElement(config: Any): LuaModifier {
+        val scope = ComposeBridge.getActiveSharedTransitionScope() ?: return this
+        val unwrapped = ComposeBridge.unwrapAny(config)
+        val map = unwrapped as? Map<*, *> ?: return this
+        val visibilityScope = (
+            ComposeBridge.unwrapAny(map["animatedVisibilityScope"])
+                as? androidx.compose.animation.AnimatedVisibilityScope
+            ) ?: (
+            ComposeBridge.unwrapAny(map["visibilityScope"])
+                as? androidx.compose.animation.AnimatedVisibilityScope
+            ) ?: ComposeBridge.getActiveAnimatedVisibilityScope()
+            ?: return this
+        val state = ComposeBridge.unwrapAny(map["sharedContentState"]) as? SharedTransitionScope.SharedContentState
+            ?: return this
+
+        val boundsTransform = when (val raw = map["boundsTransform"]) {
+            is Function2<*, *, *> -> {
+                @Suppress("UNCHECKED_CAST")
+                raw as BoundsTransform
+            }
+            is ScriptFunction -> {
+                BoundsTransform { initialBounds: Rect, targetBounds: Rect ->
+                    val result = raw.call(
+                        ComposeBridge.javaToScript(initialBounds),
+                        ComposeBridge.javaToScript(targetBounds)
+                    )
+                    ComposeBridge.scriptToJava(result) as? androidx.compose.animation.core.FiniteAnimationSpec<Rect>
+                        ?: androidx.compose.animation.core.spring()
+                }
+            }
+            else -> SharedTransitionDefaults.BoundsTransform
+        }
+
+        modifier = with(scope) {
+            modifier.sharedElement(
+                sharedContentState = state,
+                animatedVisibilityScope = visibilityScope,
+                boundsTransform = boundsTransform
+            )
+        }
         return this
     }
 

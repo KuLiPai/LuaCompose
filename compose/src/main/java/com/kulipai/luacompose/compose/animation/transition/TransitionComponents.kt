@@ -7,6 +7,7 @@ import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandIn
@@ -26,6 +27,21 @@ import com.kulipai.luacompose.compose.ui.resolveModifier
 
 internal fun registerTransitionComponents(): Map<String, @Composable (props: Map<String, Any?>, childScope: ComposeScope?) -> Unit> {
     return mapOf(
+        "SharedTransitionLayout" to { props, childScope ->
+            val modifier = resolveModifier(props["modifier"])
+
+            var actualChildScope = childScope
+            val contentObj = props["content"]
+            if (actualChildScope == null && contentObj is ScriptFunction) {
+                actualChildScope = ComposeScope(contentObj)
+            }
+
+            SharedTransitionLayout(modifier = modifier) {
+                if (actualChildScope != null) {
+                    ComposeScopeComponent(actualChildScope, this, ComposeBridge.javaToScript(this))
+                }
+            }
+        },
         "Crossfade" to { props, childScope ->
             val targetState = props["targetState"]
             val modifier = resolveModifier(props["modifier"])
@@ -142,6 +158,7 @@ internal fun registerTransitionComponents(): Map<String, @Composable (props: Map
                     ComposeScopeComponent(
                         actualChildScope,
                         this,
+                        ComposeBridge.javaToScript(this),
                         ComposeBridge.javaToScript(stateValue)
                     )
                 }

@@ -1,5 +1,6 @@
 package com.kulipai.luacompose.compose
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -11,7 +12,6 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.withTransform
 import com.kulipai.luacompose.compose.animation.AnimationPlugin
 import com.kulipai.luacompose.compose.foundation.FoundationPlugin
-import com.kulipai.luacompose.compose.foundation.layout.FoundationLayoutPlugin
 import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
 import com.kulipai.luacompose.compose.material3.Material3Plugin
 import com.kulipai.luacompose.compose.runtime.ComposeScope
@@ -224,7 +224,6 @@ object LuaComposeRegistry {
     val plugins = mutableListOf<ComposeScriptPlugin>()
 
     init {
-        registerPlugin(FoundationLayoutPlugin())
         registerGeneratedPlugin("com.kulipai.luacompose.generated.FoundationGeneratedPlugin")
         registerGeneratedPlugin("com.kulipai.luacompose.generated.FoundationLayoutGeneratedPlugin")
         registerPlugin(com.kulipai.luacompose.compose.foundation.FoundationPlugin())
@@ -242,15 +241,20 @@ object LuaComposeRegistry {
     }
 
     private fun registerGeneratedPlugin(className: String) {
-        val pluginClass = runCatching { Class.forName(className) }.getOrNull() ?: return
+        val pluginClass = runCatching { Class.forName(className) }.onFailure {
+            Log.e("LUA_PLUGIN", "Failed to load generated plugin: $className", it)
+        }.getOrNull() ?: return
         val plugin = runCatching {
             pluginClass.getDeclaredConstructor().newInstance() as ComposeScriptPlugin
+        }.onFailure {
+            Log.e("LUA_PLUGIN", "Failed to instantiate generated plugin: $className", it)
         }.getOrNull() ?: return
         registerPlugin(plugin)
     }
 
     fun registerPlugin(plugin: ComposeScriptPlugin) {
         plugins.add(plugin)
+        Log.d("LUA_PLUGIN", "Register plugin namespace=${plugin.namespace} class=${plugin::class.java.name} components=${plugin.getComponents().keys.take(8)}")
         plugin.getComponents().forEach { (name, composable) ->
             val fullName = if (plugin.namespace != null) "${plugin.namespace}.$name" else name
             components[fullName] = composable

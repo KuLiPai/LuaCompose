@@ -30,6 +30,8 @@ object ComposeBridge {
 
     private val activeScopes = ThreadLocal.withInitial { Stack<ComposeScope>() }
     private val activeNodeLists = ThreadLocal.withInitial { Stack<MutableList<ComposeNode>>() }
+    private val activeSharedTransitionScopes = ThreadLocal.withInitial { Stack<androidx.compose.animation.SharedTransitionScope>() }
+    private val activeAnimatedVisibilityScopes = ThreadLocal.withInitial { Stack<androidx.compose.animation.AnimatedVisibilityScope>() }
     
     val converters = mutableMapOf<Class<*>, (Any) -> ScriptValue>()
 
@@ -58,6 +60,34 @@ object ComposeBridge {
 
     fun popActiveNodeList() {
         val stack = activeNodeLists.get()!!
+        if (stack.isNotEmpty()) stack.pop()
+    }
+
+    fun getActiveSharedTransitionScope(): androidx.compose.animation.SharedTransitionScope? {
+        val stack = activeSharedTransitionScopes.get()!!
+        return if (stack.isNotEmpty()) stack.peek() else null
+    }
+
+    fun pushActiveSharedTransitionScope(scope: androidx.compose.animation.SharedTransitionScope) {
+        activeSharedTransitionScopes.get()!!.push(scope)
+    }
+
+    fun popActiveSharedTransitionScope() {
+        val stack = activeSharedTransitionScopes.get()!!
+        if (stack.isNotEmpty()) stack.pop()
+    }
+
+    fun getActiveAnimatedVisibilityScope(): androidx.compose.animation.AnimatedVisibilityScope? {
+        val stack = activeAnimatedVisibilityScopes.get()!!
+        return if (stack.isNotEmpty()) stack.peek() else null
+    }
+
+    fun pushActiveAnimatedVisibilityScope(scope: androidx.compose.animation.AnimatedVisibilityScope) {
+        activeAnimatedVisibilityScopes.get()!!.push(scope)
+    }
+
+    fun popActiveAnimatedVisibilityScope() {
+        val stack = activeAnimatedVisibilityScopes.get()!!
         if (stack.isNotEmpty()) stack.pop()
     }
 

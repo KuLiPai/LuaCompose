@@ -1,5 +1,4 @@
 package com.kulipai.luacompose.compose
-
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.kulipai.luacompose.compose.script.ScriptFunction
@@ -27,6 +26,42 @@ object LuaComposeLib {
 
     var rootContentFunc: ScriptFunction? = null
     var globalEnv: ScriptTable? = null
+
+    private fun ensureChildTable(parent: ScriptTable, key: String): ScriptTable {
+        val existing = parent.get(key)
+        if (!existing.isNil() && existing.isTable()) {
+            return existing.asTable()
+        }
+        val child = ComposeBridge.engine.createTable()
+        parent.set(key, child)
+        return child
+    }
+
+    private fun setNestedValue(root: ScriptTable, path: String, value: ScriptValue) {
+        val parts = path.split(".")
+        if (parts.size == 1) {
+            root.set(path, value)
+            return
+        }
+        var current = root
+        for (part in parts.dropLast(1)) {
+            current = ensureChildTable(current, part)
+        }
+        current.set(parts.last(), value)
+    }
+
+    private fun hasNestedValue(root: ScriptTable, path: String): Boolean {
+        val parts = path.split(".")
+        var current = root
+        for ((index, part) in parts.withIndex()) {
+            val existing = current.get(part)
+            if (existing.isNil()) return false
+            if (index == parts.lastIndex) return true
+            if (!existing.isTable()) return false
+            current = existing.asTable()
+        }
+        return false
+    }
 
     fun clearRuntimeState() {
         rootContentFunc = null
@@ -156,6 +191,35 @@ object LuaComposeLib {
                 }
             }
             ComposeBridge.engine.createNil()
+        })
+
+        composeTable.set("with", ComposeBridge.engine.createFunction { args ->
+            val receiver = ComposeBridge.scriptToJava(args.getOrNull(0))
+            val block = args.getOrNull(1)
+                ?: throw RuntimeException("compose.with(receiver, block) requires a block")
+            if (!block.isFunction()) {
+                throw RuntimeException("compose.with(receiver, block) block must be a function")
+            }
+
+            when (receiver) {
+                is androidx.compose.animation.SharedTransitionScope -> {
+                    ComposeBridge.pushActiveSharedTransitionScope(receiver)
+                    try {
+                        block.asFunction().call()
+                    } finally {
+                        ComposeBridge.popActiveSharedTransitionScope()
+                    }
+                }
+                is androidx.compose.animation.AnimatedVisibilityScope -> {
+                    ComposeBridge.pushActiveAnimatedVisibilityScope(receiver)
+                    try {
+                        block.asFunction().call()
+                    } finally {
+                        ComposeBridge.popActiveAnimatedVisibilityScope()
+                    }
+                }
+                else -> block.asFunction().call()
+            }
         })
 
         composeTable.set("key", ComposeBridge.engine.createFunction { args ->
@@ -346,15 +410,8 @@ object LuaComposeLib {
                     ComposeBridge.getActiveNodeList()?.add(node)
                     ComposeBridge.engine.createNil()
                 }
-                targetTable.set(componentName, func)
-
-                if (plugin is com.kulipai.luacompose.compose.foundation.FoundationPlugin) {
-                    var foundationTable = composeTable.get("foundation")
-                    if (foundationTable.isNil()) {
-                        foundationTable = ComposeBridge.engine.createTable()
-                        composeTable.set("foundation", foundationTable)
-                    }
-                    foundationTable.asTable().set(componentName, func)
+                if (!hasNestedValue(targetTable, componentName)) {
+                    setNestedValue(targetTable, componentName, func)
                 }
             }
         }

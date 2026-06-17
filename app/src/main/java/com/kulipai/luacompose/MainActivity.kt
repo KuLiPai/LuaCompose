@@ -27,6 +27,7 @@ import org.luaj.lib.ZeroArgFunction
 import org.luaj.lib.jse.CoerceJavaToLua
 import org.luaj.lib.jse.JsePlatform
 import java.io.File
+import android.util.Log
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -125,6 +126,28 @@ fun loadLuaScope(context: Context): ComposeScope {
         val env = LuajEngine.wrap(globals).asTable()
         LuaComposeLib.inject(env)
 
+        runCatching {
+            val preflight = globals.load(
+                """
+                local compose = compose
+                local foundation = compose.foundation
+                local layout = foundation and foundation.layout
+                local material3 = compose.material3
+                return
+                    layout ~= nil and layout.Column ~= nil,
+                    foundation ~= nil and foundation.Canvas ~= nil,
+                    material3 ~= nil and material3.Text ~= nil
+                """.trimIndent(),
+                "preflight.lua"
+            ).invoke()
+            Log.d(
+                "LUA_PREFLIGHT",
+                "Column=${preflight.arg1().toboolean()} Canvas=${preflight.arg(2).toboolean()} Text=${preflight.arg(3).toboolean()}"
+            )
+        }.onFailure {
+            Log.e("LUA_PREFLIGHT", "preflight failed", it)
+        }
+
         // 3. 注册 Modifier 全局对象
         globals.set("Modifier", object : ZeroArgFunction() {
             override fun call(): LuaValue {
@@ -145,11 +168,11 @@ fun loadLuaScope(context: Context): ComposeScope {
             val sampleCode = """
             -- main.lua
             local compose = compose
-            local Column = compose.foundation.Column
-            local Row = compose.foundation.Row
+            local Column = compose.foundation.layout.Column
+            local Row = compose.foundation.layout.Row
             local Text = compose.material3.Text
             local Button = compose.material3.Button
-            local Spacer = compose.foundation.Spacer
+            local Spacer = compose.foundation.layout.Spacer
             local TextField = compose.material3.TextField
             
             -- 直接使用 setContent 加载布局，无需在末尾使用 return
@@ -216,6 +239,10 @@ fun loadLuaScope(context: Context): ComposeScope {
 
         // 5. 加载并运行主 Lua 脚本
         val scriptContent = mainLuaFile.readText()
+        Log.d(
+            "LUA_SCRIPT",
+            "Loading ${mainLuaFile.absolutePath} bytes=${scriptContent.length} firstLine=${scriptContent.lineSequence().firstOrNull()}"
+        )
         val userScriptResult = globals.load(scriptContent, "main.lua").call()
 
         // 6. 优先从 compose.rootContentFunc 读取布局函数，其次从脚本返回值中读取

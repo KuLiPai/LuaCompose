@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import com.kulipai.luacompose.compose.script.ScriptValue
+import com.kulipai.luacompose.compose.runtime.ComposeBridge
 import com.kulipai.luacompose.compose.runtime.ComposeScope
 import com.kulipai.luacompose.compose.runtime.ComposeNode
 import com.kulipai.luacompose.compose.ui.resolveModifier
@@ -43,7 +44,24 @@ fun ComposeScopeComponent(scope: ComposeScope, parentComposeScope: Any? = null, 
         currentTypography,
         currentShapes,
         *args
-    ) { scope.execute(*args) }
+    ) {
+        if (parentComposeScope is androidx.compose.animation.SharedTransitionScope) {
+            ComposeBridge.pushActiveSharedTransitionScope(parentComposeScope)
+        }
+        if (parentComposeScope is androidx.compose.animation.AnimatedVisibilityScope) {
+            ComposeBridge.pushActiveAnimatedVisibilityScope(parentComposeScope)
+        }
+        try {
+            scope.execute(*args)
+        } finally {
+            if (parentComposeScope is androidx.compose.animation.AnimatedVisibilityScope) {
+                ComposeBridge.popActiveAnimatedVisibilityScope()
+            }
+            if (parentComposeScope is androidx.compose.animation.SharedTransitionScope) {
+                ComposeBridge.popActiveSharedTransitionScope()
+            }
+        }
+    }
 
     for (node in nodes) {
         ComposeNodeRenderer(node, parentComposeScope)

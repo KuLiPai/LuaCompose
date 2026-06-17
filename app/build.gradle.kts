@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val composeDebugMainJar = project(":compose").layout.buildDirectory.file(
+    "intermediates/aar_main_jar/debug/syncDebugLibJars/classes.jar"
+)
+
 android {
     namespace = "com.kulipai.luacompose"
     compileSdk {
@@ -63,4 +67,9 @@ dependencies {
 
     testImplementation(kotlin("reflect"))
     testImplementation("junit:junit:4.13.2")
+    testRuntimeOnly(files(composeDebugMainJar))
+}
+
+tasks.matching { it.name == "testDebugUnitTest" }.configureEach {
+    dependsOn(":compose:syncDebugLibJars")
 }

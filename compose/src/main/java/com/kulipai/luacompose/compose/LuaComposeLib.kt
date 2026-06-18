@@ -28,7 +28,7 @@ object LuaComposeLib {
     var globalEnv: ScriptTable? = null
 
     private fun ensureChildTable(parent: ScriptTable, key: String): ScriptTable {
-        val existing = parent.get(key)
+        val existing = parent.rawget(key)
         if (!existing.isNil() && existing.isTable()) {
             return existing.asTable()
         }
@@ -54,7 +54,7 @@ object LuaComposeLib {
         val parts = path.split(".")
         var current = root
         for ((index, part) in parts.withIndex()) {
-            val existing = current.get(part)
+            val existing = current.rawget(part)
             if (existing.isNil()) return false
             if (index == parts.lastIndex) return true
             if (!existing.isTable()) return false
@@ -71,7 +71,7 @@ object LuaComposeLib {
     fun inject(env: ScriptTable): ScriptTable {
         clearRuntimeState()
         globalEnv = env
-        val composeTable = ComposeBridge.engine.createTable()
+        val composeTable = ComposeBridge.createLazyNamespace("androidx.compose")
         env.set("compose", composeTable)
 
         composeTable.set("dp", ComposeBridge.engine.createFunction { args ->
@@ -86,70 +86,6 @@ object LuaComposeLib {
             rootContentFunc = args[0].asFunction()
             ComposeBridge.engine.createNil()
         })
-
-        val uiTable = ComposeBridge.engine.createTable()
-        composeTable.set("ui", uiTable)
-        uiTable.set("Alignment", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.Alignment.Companion))
-        
-        val graphicsTable = ComposeBridge.engine.createTable()
-        uiTable.set("graphics", graphicsTable)
-        graphicsTable.set("Color", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.graphics.Color.Companion))
-        graphicsTable.set("RectangleShape", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.graphics.RectangleShape))
-        
-        val layoutTable = ComposeBridge.engine.createTable()
-        uiTable.set("layout", layoutTable)
-        layoutTable.set("ContentScale", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.layout.ContentScale.Companion))
-        
-        val textTable = ComposeBridge.engine.createTable()
-        uiTable.set("text", textTable)
-        val textStyleTable = ComposeBridge.engine.createTable()
-        textTable.set("style", textStyleTable)
-        val textFontTable = ComposeBridge.engine.createTable()
-        textTable.set("font", textFontTable)
-        
-        textStyleTable.set("TextAlign", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.style.TextAlign.Companion))
-        textStyleTable.set("TextDecoration", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.style.TextDecoration.Companion))
-        textStyleTable.set("TextOverflow", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.style.TextOverflow.Companion))
-        
-        textFontTable.set("FontWeight", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.font.FontWeight.Companion))
-        textFontTable.set("FontStyle", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.font.FontStyle.Companion))
-        textFontTable.set("FontFamily", ComposeBridge.engine.coerceJavaToScript(androidx.compose.ui.text.font.FontFamily.Companion))
-
-        val foundationTable = ComposeBridge.engine.createTable()
-        composeTable.set("foundation", foundationTable)
-        val foundationLayoutTable = ComposeBridge.engine.createTable()
-        foundationTable.set("layout", foundationLayoutTable)
-        val arrangementTable = ComposeBridge.engine.createTable()
-        val arrangementMeta = ComposeBridge.engine.createTable()
-        arrangementMeta.set("__index", ComposeBridge.engine.createFunction { args ->
-            val key = args[1].toStringValue()
-            if (key == "spacedBy") {
-                return@createFunction ComposeBridge.engine.createFunction { spacedByArgs ->
-                    val spaceObj = spacedByArgs[0]
-                    val space = if (spaceObj.isNumber()) spaceObj.toDouble().toFloat() else com.kulipai.luacompose.compose.ui.resolveDp(ComposeBridge.scriptToJava(spaceObj)).value
-                    if (spacedByArgs.size > 1) {
-                        val alignObj = ComposeBridge.scriptToJava(spacedByArgs[1])
-                        if (alignObj is androidx.compose.ui.Alignment.Horizontal) {
-                            return@createFunction ComposeBridge.engine.coerceJavaToScript(androidx.compose.foundation.layout.Arrangement.spacedBy(androidx.compose.ui.unit.Dp(space), alignObj))
-                        } else if (alignObj is androidx.compose.ui.Alignment.Vertical) {
-                            return@createFunction ComposeBridge.engine.coerceJavaToScript(androidx.compose.foundation.layout.Arrangement.spacedBy(androidx.compose.ui.unit.Dp(space), alignObj))
-                        }
-                    }
-                    ComposeBridge.engine.coerceJavaToScript(androidx.compose.foundation.layout.Arrangement.spacedBy(androidx.compose.ui.unit.Dp(space)))
-                }
-            }
-            try {
-                val getterName = "get" + key.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
-                val method = androidx.compose.foundation.layout.Arrangement::class.java.getMethod(getterName)
-                return@createFunction ComposeBridge.engine.coerceJavaToScript(method.invoke(androidx.compose.foundation.layout.Arrangement))
-            } catch (e: Exception) {
-                return@createFunction ComposeBridge.engine.createNil()
-            }
-        })
-        arrangementTable.setMetatable(arrangementMeta)
-        foundationLayoutTable.set("Arrangement", arrangementTable)
-        uiTable.set("Arrangement", arrangementTable) // Alias for user convenience
-
 
         composeTable.set("state", ComposeBridge.engine.createFunction { args ->
             val scope = ComposeBridge.getActiveScope()
@@ -173,7 +109,6 @@ object LuaComposeLib {
                 ?: throw RuntimeException("compose.derivedStateOf() 必须在 Compose 上下文中调用")
             scope.getOrCreateDerivedState(args[0].asFunction())
         })
-
         composeTable.set("LaunchedEffect", ComposeBridge.engine.createFunction { args ->
             val effectFunc = args[0]
             val activeScope = ComposeBridge.getActiveScope()
@@ -181,7 +116,7 @@ object LuaComposeLib {
                 val key = "effect_${effectFunc.hashCode()}"
                 if (activeScope.effectStates[key] == null) {
                     activeScope.effectStates[key] = true
-                    activeScope.coroutineScope?.launch(Dispatchers.Default) {
+                    activeScope.coroutineScope?.launch(kotlinx.coroutines.Dispatchers.Default) {
                         try {
                             effectFunc.asFunction().call()
                         } catch (e: Exception) {
@@ -201,24 +136,15 @@ object LuaComposeLib {
                 throw RuntimeException("compose.with(receiver, block) block must be a function")
             }
 
-            when (receiver) {
-                is androidx.compose.animation.SharedTransitionScope -> {
-                    ComposeBridge.pushActiveSharedTransitionScope(receiver)
-                    try {
-                        block.asFunction().call()
-                    } finally {
-                        ComposeBridge.popActiveSharedTransitionScope()
-                    }
+            if (receiver != null) {
+                ComposeBridge.pushContextReceiver(receiver)
+                try {
+                    block.asFunction().call()
+                } finally {
+                    ComposeBridge.popContextReceiver()
                 }
-                is androidx.compose.animation.AnimatedVisibilityScope -> {
-                    ComposeBridge.pushActiveAnimatedVisibilityScope(receiver)
-                    try {
-                        block.asFunction().call()
-                    } finally {
-                        ComposeBridge.popActiveAnimatedVisibilityScope()
-                    }
-                }
-                else -> block.asFunction().call()
+            } else {
+                block.asFunction().call()
             }
         })
 
@@ -366,10 +292,12 @@ object LuaComposeLib {
             val targetTable = if (plugin.namespace != null) {
                 val parts = plugin.namespace!!.split(".")
                 var currentTable = composeTable
+                var currentPackage = "androidx.compose"
                 for (part in parts) {
+                    currentPackage = "$currentPackage.$part"
                     var nextTable = currentTable.get(part)
                     if (nextTable.isNil()) {
-                        nextTable = ComposeBridge.engine.createTable()
+                        nextTable = ComposeBridge.createLazyNamespace(currentPackage)
                         currentTable.set(part, nextTable)
                     }
                     currentTable = nextTable.asTable()

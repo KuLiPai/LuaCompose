@@ -223,7 +223,9 @@ class LuaModifier(var modifier: Modifier = Modifier) {
 
     @OptIn(ExperimentalSharedTransitionApi::class)
     fun sharedElement(config: Any): LuaModifier {
-        val scope = ComposeBridge.getActiveSharedTransitionScope() ?: return this
+        val scope = ComposeBridge.getActiveSharedTransitionScope() 
+            ?: ComposeBridge.findContextReceiver<androidx.compose.animation.SharedTransitionScope>() 
+            ?: return this
         val unwrapped = ComposeBridge.unwrapAny(config)
         val map = unwrapped as? Map<*, *> ?: return this
         val visibilityScope = (
@@ -233,6 +235,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             ComposeBridge.unwrapAny(map["visibilityScope"])
                 as? androidx.compose.animation.AnimatedVisibilityScope
             ) ?: ComposeBridge.getActiveAnimatedVisibilityScope()
+            ?: ComposeBridge.findContextReceiver<androidx.compose.animation.AnimatedVisibilityScope>()
             ?: return this
         val state = ComposeBridge.unwrapAny(map["sharedContentState"]) as? SharedTransitionScope.SharedContentState
             ?: return this
@@ -265,60 +268,64 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return this
     }
 
-    fun pointerInput(gestures: Any): LuaModifier {
-        val unwrapped = ComposeBridge.unwrapAny(gestures)
-        if (unwrapped !is Map<*, *>) return this
-        val onTap = unwrapped["onTap"] as? ScriptFunction
-        val onDoubleTap = unwrapped["onDoubleTap"] as? ScriptFunction
-        val onLongPress = unwrapped["onLongPress"] as? ScriptFunction
-        val onDrag = unwrapped["onDrag"] as? ScriptFunction
-
-        if (onTap != null || onDoubleTap != null || onLongPress != null) {
-            modifier = modifier.pointerInput("tapGestures") {
-                detectTapGestures(
-                    onTap = onTap?.let { fn ->
-                        { offset ->
-                            fn.call(
-                                ComposeBridge.engine.createValue(
-                                    offset.x.toDouble()
-                                ), ComposeBridge.engine.createValue(offset.y.toDouble())
-                            )
-                        }
-                    },
-                    onDoubleTap = onDoubleTap?.let { fn ->
-                        { offset ->
-                            fn.call(
-                                ComposeBridge.engine.createValue(
-                                    offset.x.toDouble()
-                                ), ComposeBridge.engine.createValue(offset.y.toDouble())
-                            )
-                        }
-                    },
-                    onLongPress = onLongPress?.let { fn ->
-                        { offset ->
-                            fn.call(
-                                ComposeBridge.engine.createValue(
-                                    offset.x.toDouble()
-                                ), ComposeBridge.engine.createValue(offset.y.toDouble())
-                            )
-                        }
-                    }
-                )
-            }
+    fun pointerInput(arg: Any): LuaModifier {
+        val blockValue = if (arg is ScriptValue) arg else ComposeBridge.engine.coerceJavaToScript(arg)
+        if (blockValue.isFunction()) {
+            return internalPointerInput(emptyArray(), arg)
         }
+        val unwrapped = ComposeBridge.unwrapAny(arg)
+        if (unwrapped is Map<*, *>) {
+            val onTap = unwrapped["onTap"] as? ScriptFunction
+            val onDoubleTap = unwrapped["onDoubleTap"] as? ScriptFunction
+            val onLongPress = unwrapped["onLongPress"] as? ScriptFunction
+            val onDrag = unwrapped["onDrag"] as? ScriptFunction
 
-        if (onDrag != null) {
-            modifier = modifier.pointerInput("dragGestures") {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    onDrag.call(
-                        ComposeBridge.engine.createValue(dragAmount.x.toDouble()),
-                        ComposeBridge.engine.createValue(dragAmount.y.toDouble())
+            if (onTap != null || onDoubleTap != null || onLongPress != null) {
+                modifier = modifier.pointerInput("tapGestures") {
+                    detectTapGestures(
+                        onTap = onTap?.let { fn ->
+                            { offset ->
+                                fn.call(
+                                    ComposeBridge.engine.createValue(
+                                        offset.x.toDouble()
+                                    ), ComposeBridge.engine.createValue(offset.y.toDouble())
+                                )
+                            }
+                        },
+                        onDoubleTap = onDoubleTap?.let { fn ->
+                            { offset ->
+                                fn.call(
+                                    ComposeBridge.engine.createValue(
+                                        offset.x.toDouble()
+                                    ), ComposeBridge.engine.createValue(offset.y.toDouble())
+                                )
+                            }
+                        },
+                        onLongPress = onLongPress?.let { fn ->
+                            { offset ->
+                                fn.call(
+                                    ComposeBridge.engine.createValue(
+                                        offset.x.toDouble()
+                                    ), ComposeBridge.engine.createValue(offset.y.toDouble())
+                                )
+                            }
+                        }
                     )
                 }
             }
+            if (onDrag != null) {
+                modifier = modifier.pointerInput("dragGestures") {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        val changeTable = ComposeBridge.engine.createTable()
+                        val dragAmountTable = ComposeBridge.engine.createTable()
+                        dragAmountTable.set("x", ComposeBridge.engine.createValue(dragAmount.x.toDouble()))
+                        dragAmountTable.set("y", ComposeBridge.engine.createValue(dragAmount.y.toDouble()))
+                        onDrag.call(changeTable, dragAmountTable)
+                    }
+                }
+            }
         }
-
         return this
     }
 
@@ -335,16 +342,26 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return this
     }
 
-    fun pointerInput(vararg args: Any): LuaModifier {
-        if (args.isEmpty()) return this
-        val keys = args.dropLast(1).map { ComposeBridge.unwrapAny(it) }.toTypedArray()
-        val blockValueRaw = args.last()
+
+
+    fun pointerInput(key1: Any, blockValueRaw: Any): LuaModifier {
+        return internalPointerInput(arrayOf(ComposeBridge.unwrapAny(key1)), blockValueRaw)
+    }
+
+    fun pointerInput(key1: Any, key2: Any, blockValueRaw: Any): LuaModifier {
+        return internalPointerInput(arrayOf(ComposeBridge.unwrapAny(key1), ComposeBridge.unwrapAny(key2)), blockValueRaw)
+    }
+
+    fun pointerInput(key1: Any, key2: Any, key3: Any, blockValueRaw: Any): LuaModifier {
+        return internalPointerInput(arrayOf(ComposeBridge.unwrapAny(key1), ComposeBridge.unwrapAny(key2), ComposeBridge.unwrapAny(key3)), blockValueRaw)
+    }
+
+    private fun internalPointerInput(keys: Array<Any?>, blockValueRaw: Any): LuaModifier {
         val blockValue = if (blockValueRaw is ScriptValue) blockValueRaw else ComposeBridge.engine.coerceJavaToScript(blockValueRaw)
         val block = if (blockValue.isFunction()) blockValue.asFunction() else null
         
         if (block != null) {
             val lambda: suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit = {
-                android.util.Log.e("LUAMODIFIER_LOG", "POINTER INPUT LAMBDA EXECUTING!!")
                 val actions = mutableListOf<suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit>()
                 ComposeBridge.pushActivePointerInputScopeActions(actions)
                 try {

@@ -40,6 +40,7 @@ class LuajTable(val luajTable: org.luaj.LuaTable) : ScriptTable, ScriptValue by 
     override fun get(key: String): ScriptValue = LuajEngine.wrap(luajTable.get(key))
     override fun get(index: Int): ScriptValue = LuajEngine.wrap(luajTable.get(index))
     override fun get(key: ScriptValue): ScriptValue = LuajEngine.wrap(luajTable.get(key.toLuaj()))
+    override fun rawget(key: String): ScriptValue = LuajEngine.wrap(luajTable.rawget(key))
     
     override fun set(key: String, value: ScriptValue) { luajTable.set(key, value.toLuaj()) }
     override fun set(index: Int, value: ScriptValue) { luajTable.set(index, value.toLuaj()) }

@@ -18,6 +18,10 @@ import com.kulipai.luacompose.compose.script.ScriptValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.util.Stack
+import kotlin.reflect.KClass
+import kotlin.reflect.KProperty1
+import kotlin.reflect.KFunction
+import kotlin.reflect.full.companionObjectInstance
 
 data class ComposeNode(
     val type: String,
@@ -32,6 +36,21 @@ object ComposeBridge {
     private val activeNodeLists = ThreadLocal.withInitial { Stack<MutableList<ComposeNode>>() }
     private val activeSharedTransitionScopes = ThreadLocal.withInitial { Stack<androidx.compose.animation.SharedTransitionScope>() }
     private val activeAnimatedVisibilityScopes = ThreadLocal.withInitial { Stack<androidx.compose.animation.AnimatedVisibilityScope>() }
+    
+    val contextReceiversStack = ThreadLocal.withInitial { ArrayDeque<Any>() }
+    
+    fun pushContextReceiver(receiver: Any) {
+        contextReceiversStack.get().addLast(receiver)
+    }
+
+    fun popContextReceiver() {
+        contextReceiversStack.get().removeLast()
+    }
+
+    inline fun <reified T> findContextReceiver(): T? {
+        val stack = contextReceiversStack.get()
+        return stack.findLast { it is T } as? T
+    }
     
     val converters = mutableMapOf<Class<*>, (Any) -> ScriptValue>()
 
@@ -132,9 +151,12 @@ object ComposeBridge {
                 val isOffset = table.get("_javaOffset")
                 val isIntOffset = table.get("_javaIntOffset")
                 val isStroke = table.get("_javaStroke")
+                val isJavaObj = table.get("_javaObj")
 
                 if (isState.isBoolean() && isState.toBoolean()) {
                     table.get("javaState").asUserdata()
+                } else if (isJavaObj.isUserdata()) {
+                    isJavaObj.asUserdata()
                 } else if (isColor.isUserdata()) {
                     isColor.asUserdata()
                 } else if (isDp.isUserdata()) {
@@ -197,16 +219,194 @@ object ComposeBridge {
             is ScriptValue -> value
             else -> {
                 val clazz = value::class.java
-                android.util.Log.d("LUA_ANIM", "javaToScript for clazz: ${clazz.name}")
                 for ((cls, converter) in converters) {
                     if (cls.isAssignableFrom(clazz)) {
-                        android.util.Log.d("LUA_ANIM", "javaToScript MATCHED CONVERTER for clazz: ${clazz.name}")
                         return converter(value)
                     }
                 }
-                engine.coerceJavaToScript(value)
+                // Fallback to our generic wrapObject!
+                wrapObject(value)
             }
         }
+    }
+
+    fun coerceArg(argVal: Any?, paramType: kotlin.reflect.KType): Any? {
+        if (argVal is Number) {
+            when (paramType.classifier) {
+                Float::class -> return argVal.toFloat()
+                Int::class -> return argVal.toInt()
+                Long::class -> return argVal.toLong()
+                Double::class -> return argVal.toDouble()
+                androidx.compose.ui.unit.Dp::class -> return androidx.compose.ui.unit.Dp(argVal.toFloat())
+            }
+        }
+        return argVal
+    }
+
+    fun wrapObject(obj: Any): ScriptValue {
+        if (obj is ScriptValue) return obj
+        val instance = engine.createTable()
+        instance.set("_javaObj", engine.createUserdata(obj))
+        
+        val instanceMeta = engine.createTable()
+        instanceMeta.set("__index", engine.createFunction { args ->
+            val key = args[1].toStringValue()
+            try {
+                val kClass = obj::class
+                val prop = kClass.members.find { it.name == key } as? kotlin.reflect.KProperty1<Any, *>
+                if (prop != null) {
+                    return@createFunction javaToScript(prop.getter.call(obj))
+                }
+                
+                val funcs = kClass.members.filter { it.name == key && it is kotlin.reflect.KFunction<*> } as List<kotlin.reflect.KFunction<*>>
+                if (funcs.isNotEmpty()) {
+                    return@createFunction engine.createFunction { funcArgs ->
+                        try {
+                            val isSelf = funcArgs.getOrNull(0)?.isTable() == true && !funcArgs.getOrNull(0)!!.asTable().get("_javaObj").isNil() && funcArgs.getOrNull(0)!!.asTable().get("_javaObj").asUserdata() === obj
+                            val expectedLuaArgs = funcArgs.size - (if (isSelf) 1 else 0)
+                            val targetFunc = funcs.find { f -> 
+                                f.parameters.count { it.kind != kotlin.reflect.KParameter.Kind.INSTANCE } == expectedLuaArgs
+                            } ?: funcs.first()
+                            
+                            val kotlinArgs = mutableListOf<Any?>()
+                            var luaArgIndex = 0
+                            for (param in targetFunc.parameters) {
+                                if (param.kind == kotlin.reflect.KParameter.Kind.INSTANCE) {
+                                    kotlinArgs.add(obj)
+                                } else {
+                                    val scriptArg = funcArgs.getOrNull(luaArgIndex)
+                                    if (scriptArg != null && scriptArg.isTable() && !scriptArg.asTable().get("_javaObj").isNil() && scriptArg.asTable().get("_javaObj").asUserdata() === obj) {
+                                        luaArgIndex++
+                                    }
+                                    val nextArg = funcArgs.getOrNull(luaArgIndex++)
+                                    kotlinArgs.add(coerceArg(scriptToJava(nextArg), param.type))
+                                }
+                            }
+                            val result = targetFunc.call(*kotlinArgs.toTypedArray())
+                            return@createFunction javaToScript(result)
+                        } catch (e: Exception) {
+                            android.util.Log.e("LUA_REFLECTION", "Error calling $key on obj class ${obj::class}", e)
+                        }
+                        engine.createNil()
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            engine.createNil()
+        })
+        instance.setMetatable(instanceMeta)
+        return instance
+    }
+
+    fun wrapClass(kClass: kotlin.reflect.KClass<*>): ScriptValue {
+        val classTable = engine.createTable()
+        val classMeta = engine.createTable()
+        
+        classMeta.set("__index", engine.createFunction { args ->
+            val key = args[1].toStringValue()
+            val staticObj = kClass.objectInstance ?: kClass.companionObjectInstance
+            if (staticObj != null) {
+                if (key == "spacedBy") {
+                    android.util.Log.d("LUA_REFLECTION", "spacedBy requested on ${staticObj::class}. Members: ${staticObj::class.members.map { it.name }}")
+                }
+                try {
+                    val prop = staticObj::class.members.find { it.name == key } as? kotlin.reflect.KProperty1<Any, *>
+                    if (prop != null) {
+                        return@createFunction javaToScript(prop.getter.call(staticObj))
+                    }
+                    val funcs = staticObj::class.members.filter { it.name == key && it is kotlin.reflect.KFunction<*> } as List<kotlin.reflect.KFunction<*>>
+                    android.util.Log.d("LUA_REFLECTION", "Found ${funcs.size} KFunctions for key $key")
+                    if (funcs.isNotEmpty()) {
+                        return@createFunction engine.createFunction { funcArgs ->
+                            try {
+                                // Simple overload resolution based on arg count
+                                val isSelf = funcArgs.getOrNull(0)?.isTable() == true && !funcArgs.getOrNull(0)!!.asTable().get("_javaObj").isNil() && funcArgs.getOrNull(0)!!.asTable().get("_javaObj").asUserdata() === staticObj
+                                val expectedLuaArgs = funcArgs.size - (if (isSelf) 1 else 0)
+                                val targetFunc = funcs.find { f -> 
+                                    f.parameters.count { it.kind != kotlin.reflect.KParameter.Kind.INSTANCE } == expectedLuaArgs
+                                } ?: funcs.first()
+                                
+                                val kotlinArgs = mutableListOf<Any?>()
+                                var luaArgIndex = 0
+                                for (param in targetFunc.parameters) {
+                                    if (param.kind == kotlin.reflect.KParameter.Kind.INSTANCE) {
+                                        kotlinArgs.add(staticObj)
+                                    } else {
+                                        val scriptArg = funcArgs.getOrNull(luaArgIndex)
+                                        if (scriptArg != null && scriptArg.isTable() && !scriptArg.asTable().get("_javaObj").isNil() && scriptArg.asTable().get("_javaObj").asUserdata() === staticObj) {
+                                            luaArgIndex++
+                                        }
+                                        val nextArg = funcArgs.getOrNull(luaArgIndex++)
+                                        kotlinArgs.add(coerceArg(scriptToJava(nextArg), param.type))
+                                    }
+                                }
+                                val result = targetFunc.call(*kotlinArgs.toTypedArray())
+                                return@createFunction javaToScript(result)
+                            } catch (e: Exception) {
+                                android.util.Log.e("LUA_REFLECTION", "Error calling $key on class ${staticObj::class}", e)
+                            }
+                            engine.createNil()
+                        }
+                    }
+                } catch(e: Exception) { e.printStackTrace() }
+            } else {
+                android.util.Log.d("LUA_REFLECTION", "staticObj is null for class: ${kClass.qualifiedName}, requested key: $key")
+            }
+            engine.createNil()
+        })
+        
+        classMeta.set("__call", engine.createFunction { args ->
+            try {
+                val constructor = kClass.constructors.find { it.parameters.size == args.size - 1 } ?: kClass.constructors.firstOrNull()
+                if (constructor != null) {
+                    val kotlinArgs = mutableListOf<Any?>()
+                    var luaArgIndex = 1 // 0 is the table itself
+                    for (param in constructor.parameters) {
+                        val nextArg = args.getOrNull(luaArgIndex++)
+                        kotlinArgs.add(coerceArg(scriptToJava(nextArg), param.type))
+                    }
+                    val instance = constructor.call(*kotlinArgs.toTypedArray())
+                    return@createFunction javaToScript(instance)
+                } else {
+                    val staticObj = kClass.objectInstance ?: kClass.companionObjectInstance
+                    if (staticObj != null) {
+                        return@createFunction javaToScript(staticObj)
+                    }
+                }
+            } catch(e: Exception) { e.printStackTrace() }
+            engine.createNil()
+        })
+        
+        classTable.setMetatable(classMeta)
+        return classTable
+    }
+
+    fun createLazyNamespace(pathPrefix: String): com.kulipai.luacompose.compose.script.ScriptTable {
+        val nsTable = engine.createTable()
+        val nsMeta = engine.createTable()
+        nsMeta.set("__index", engine.createFunction { args ->
+            val key = args[1].toStringValue()
+            val fullPath = if (pathPrefix.isEmpty()) key else "$pathPrefix.$key"
+            
+            if (key.isNotEmpty() && key[0].isUpperCase()) {
+                try {
+                    val className = if (!fullPath.startsWith("androidx.compose.")) "androidx.compose.$fullPath" else fullPath
+                    val clazz = Class.forName(className).kotlin
+                    val wrapped = wrapClass(clazz)
+                    nsTable.set(key, wrapped) 
+                    return@createFunction wrapped
+                } catch (e: Exception) {
+                    
+                }
+            }
+            
+            val childNs = createLazyNamespace(fullPath)
+            nsTable.set(key, childNs) 
+            return@createFunction childNs
+        })
+        nsTable.setMetatable(nsMeta)
+        return nsTable
     }
 }
 

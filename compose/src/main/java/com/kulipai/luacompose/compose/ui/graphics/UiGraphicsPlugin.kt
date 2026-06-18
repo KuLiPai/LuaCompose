@@ -68,53 +68,69 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
             val instance = ComposeBridge.engine.createTable()
             instance.set("_javaColor", ComposeBridge.engine.createUserdata(color))
             
-            instance.set("luminance", ComposeBridge.engine.createFunction { innerArgs ->
-                ComposeBridge.javaToScript(color.luminance())
-            })
-            instance.set("copy", ComposeBridge.engine.createFunction { innerArgs ->
-                val startIdx = if (innerArgs.isNotEmpty() && innerArgs[0].isTable() && !innerArgs[0].asTable().get("_javaColor").isNil()) 1 else 0
-                val params = innerArgs.getOrNull(startIdx)
-                val alpha = if (params != null && params.isTable()) {
-                    val alphaVal = params.asTable().get("alpha")
-                    if (!alphaVal.isNil()) alphaVal.toFloat() else color.alpha
-                } else if (params != null && !params.isNil()) {
-                    params.toFloat()
-                } else {
-                    color.alpha
+            val instanceMeta = ComposeBridge.engine.createTable()
+            instanceMeta.set("__index", ComposeBridge.engine.createFunction { innerArgs ->
+                val key = innerArgs[1].toStringValue()
+                try {
+                    // Use kotlin-reflect to find the property dynamically on Color
+                    val prop = Color::class.members.find { it.name == key } as? kotlin.reflect.KProperty1<Any, *>
+                    if (prop != null) {
+                        val value = prop.getter.call(color)
+                        return@createFunction ComposeBridge.javaToScript(value)
+                    }
+                    
+                    // Fallback to manual functions
+                    if (key == "luminance") {
+                        return@createFunction ComposeBridge.engine.createFunction { _ ->
+                            ComposeBridge.javaToScript(color.luminance())
+                        }
+                    } else if (key == "copy") {
+                        return@createFunction ComposeBridge.engine.createFunction { funcArgs ->
+                            val startIdx = if (funcArgs.isNotEmpty() && funcArgs[0].isTable() && !funcArgs[0].asTable().get("_javaColor").isNil()) 1 else 0
+                            val params = funcArgs.getOrNull(startIdx)
+                            val alpha = if (params != null && params.isTable()) {
+                                val alphaVal = params.asTable().get("alpha")
+                                if (!alphaVal.isNil()) alphaVal.toFloat() else color.alpha
+                            } else if (params != null && !params.isNil()) {
+                                params.toFloat()
+                            } else {
+                                color.alpha
+                            }
+                            ComposeBridge.javaToScript(color.copy(alpha = alpha))
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-                ComposeBridge.javaToScript(color.copy(alpha = alpha))
+                ComposeBridge.engine.createNil()
             })
+            instance.setMetatable(instanceMeta)
             instance
         }
 
-                val colorCompanionTable = ComposeBridge.engine.createTable()
-                colorCompanionTable.set("Black", ComposeBridge.javaToScript(Color.Black))
-                colorCompanionTable.set("DarkGray", ComposeBridge.javaToScript(Color.DarkGray))
-                colorCompanionTable.set("Gray", ComposeBridge.javaToScript(Color.Gray))
-                colorCompanionTable.set("LightGray", ComposeBridge.javaToScript(Color.LightGray))
-                colorCompanionTable.set("White", ComposeBridge.javaToScript(Color.White))
-                colorCompanionTable.set("Red", ComposeBridge.javaToScript(Color.Red))
-                colorCompanionTable.set("Green", ComposeBridge.javaToScript(Color.Green))
-                colorCompanionTable.set("Blue", ComposeBridge.javaToScript(Color.Blue))
-                colorCompanionTable.set("Yellow", ComposeBridge.javaToScript(Color.Yellow))
-                colorCompanionTable.set("Cyan", ComposeBridge.javaToScript(Color.Cyan))
-                colorCompanionTable.set("Magenta", ComposeBridge.javaToScript(Color.Magenta))
-                colorCompanionTable.set("Transparent", ComposeBridge.javaToScript(Color.Transparent))
-                colorCompanionTable.set("Unspecified", ComposeBridge.javaToScript(Color.Unspecified))
-        
-                val colorTableMeta = ComposeBridge.engine.createTable()
-                colorTableMeta.set("__index", ComposeBridge.engine.createFunction { args ->
-                    val key = args[1]
-                    colorCompanionTable.get(key.toStringValue())
-                })
-                colorTableMeta.set("__call", ComposeBridge.engine.createFunction { args ->
-                    val params = args[1]
-                    val colorInt = params.toDouble().toLong().toInt()
-                    ComposeBridge.javaToScript(Color(colorInt))
-                })
-                val colorTable = ComposeBridge.engine.createTable()
-                colorTable.setMetatable(colorTableMeta)
-                scriptTable.set("Color", colorTable)
+        val colorTableMeta = ComposeBridge.engine.createTable()
+        colorTableMeta.set("__index", ComposeBridge.engine.createFunction { args ->
+            val key = args[1].toStringValue()
+            try {
+                // Use kotlin-reflect to find the property dynamically on Color.Companion
+                val prop = Color.Companion::class.members.find { it.name == key } as? kotlin.reflect.KProperty1<Any, *>
+                if (prop != null) {
+                    val value = prop.getter.call(Color.Companion)
+                    return@createFunction ComposeBridge.javaToScript(value)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            ComposeBridge.engine.createNil()
+        })
+        colorTableMeta.set("__call", ComposeBridge.engine.createFunction { args ->
+            val params = args[1]
+            val colorInt = params.toDouble().toLong().toInt()
+            ComposeBridge.javaToScript(Color(colorInt))
+        })
+        val colorTable = ComposeBridge.engine.createTable()
+        colorTable.setMetatable(colorTableMeta)
+        scriptTable.set("Color", colorTable)
         
                 
         // ------------------- TransformOrigin ---------------

@@ -51,6 +51,7 @@ class AnimationPlugin : ComposeScriptPlugin {
     override fun injectGlobals(scriptTable: ScriptTable) {
         scriptTable.set("rememberSharedContentState", ComposeBridge.engine.createFunction { args ->
             val scope = ComposeBridge.getActiveSharedTransitionScope()
+                ?: ComposeBridge.findContextReceiver<androidx.compose.animation.SharedTransitionScope>()
                 ?: throw RuntimeException("rememberSharedContentState() 必须在 SharedTransitionLayout/SharedTransitionScope 中调用")
             val activeScope = ComposeBridge.getActiveScope()
                 ?: throw RuntimeException("rememberSharedContentState() 必须在 Compose 上下文中调用")

@@ -25,6 +25,7 @@ interface ScriptTable : ScriptValue {
     fun get(key: String): ScriptValue
     fun get(index: Int): ScriptValue
     fun get(key: ScriptValue): ScriptValue
+    fun rawget(key: String): ScriptValue
     
     fun set(key: String, value: ScriptValue)
     fun set(index: Int, value: ScriptValue)

@@ -126,24 +126,32 @@ object ComposeBridge {
         if (stack.isNotEmpty()) stack.pop()
     }
 
-    fun scriptToJava(value: ScriptValue?): Any? {
+    fun scriptToJava(value: ScriptValue?, visited: MutableList<Any> = mutableListOf(), depth: Int = 0): Any? {
+        if (depth > 100) {
+            android.util.Log.e("LUA_COMPOSE", "Depth limit exceeded in scriptToJava")
+            return null
+        }
         if (value == null || value.isNil()) return null
         return when {
             value.isBoolean() -> value.toBoolean()
             value.isNumber() -> {
                 val d = value.toDouble()
-                val l = d.toLong()
-                if (d == l.toDouble()) {
-                    if (l in Int.MIN_VALUE..Int.MAX_VALUE) l.toInt() else l
-                } else {
-                    d
-                }
+                if (d == d.toLong().toDouble()) d.toInt() else d.toFloat()
             }
             value.isString() -> value.toStringValue()
             value.isFunction() -> value
             value.isUserdata() -> value.asUserdata()
             value.isTable() -> {
                 val table = value.asTable()
+                val tableUserdata = table.get("_javaObj").asUserdata()
+                val visitedKey = tableUserdata ?: table.stableId
+                
+                if (visited.contains(visitedKey)) {
+                    android.util.Log.w("LUA_COMPOSE", "Circular reference detected in Lua table")
+                    return null
+                }
+                visited.add(visitedKey)
+
                 val isState = table.get("_isState")
                 val isColor = table.get("_javaColor")
                 val isDp = table.get("_javaDp")
@@ -153,7 +161,7 @@ object ComposeBridge {
                 val isStroke = table.get("_javaStroke")
                 val isJavaObj = table.get("_javaObj")
 
-                if (isState.isBoolean() && isState.toBoolean()) {
+                val result = if (isState.isBoolean() && isState.toBoolean()) {
                     table.get("javaState").asUserdata()
                 } else if (isJavaObj.isUserdata()) {
                     isJavaObj.asUserdata()
@@ -174,24 +182,31 @@ object ComposeBridge {
                     if (len > 0) {
                         val list = mutableListOf<Any?>()
                         for (i in 1..len) {
-                            list.add(scriptToJava(table.get(i)))
+                            list.add(scriptToJava(table.get(i), visited, depth + 1))
                         }
                         list
                     } else {
-                        scriptTableToMap(table)
+                        scriptTableToMap(table, visited, depth + 1)
                     }
                 }
+                visited.remove(visitedKey)
+                result
             }
             else -> value
         }
     }
 
-    fun scriptTableToMap(table: ScriptTable): Map<String, Any?> {
+    fun scriptTableToMap(table: ScriptTable, visited: MutableList<Any> = mutableListOf(), depth: Int = 0): Map<String, Any?> {
         val map = mutableMapOf<String, Any?>()
         val keys = table.keys()
         for (key in keys) {
             val kStr = key.toStringValue()
-            map[kStr] = scriptToJava(table.get(key))
+            try {
+                map[kStr] = scriptToJava(table.get(key), visited, depth + 1)
+            } catch (e: StackOverflowError) {
+                android.util.Log.e("LUA_COMPOSE", "StackOverflowError when processing key: $kStr")
+                throw e
+            }
         }
         return map
     }
@@ -230,17 +245,63 @@ object ComposeBridge {
         }
     }
 
-    fun coerceArg(argVal: Any?, paramType: kotlin.reflect.KType): Any? {
+    fun coerceArg(argVal: Any?, paramClass: Class<*>): Any? {
         if (argVal is Number) {
-            when (paramType.classifier) {
-                Float::class -> return argVal.toFloat()
-                Int::class -> return argVal.toInt()
-                Long::class -> return argVal.toLong()
-                Double::class -> return argVal.toDouble()
-                androidx.compose.ui.unit.Dp::class -> return androidx.compose.ui.unit.Dp(argVal.toFloat())
+            when (paramClass) {
+                Float::class.java, Float::class.javaPrimitiveType -> return argVal.toFloat()
+                Int::class.java, Int::class.javaPrimitiveType -> return argVal.toInt()
+                Long::class.java, Long::class.javaPrimitiveType -> return argVal.toLong()
+                Double::class.java, Double::class.javaPrimitiveType -> return argVal.toDouble()
+                androidx.compose.ui.unit.Dp::class.java -> return androidx.compose.ui.unit.Dp(argVal.toFloat())
             }
         }
         return argVal
+    }
+    private class ClassReflectionCache(javaClass: Class<*>) {
+        val properties: Map<String, java.lang.reflect.Method>
+        val fields: Map<String, java.lang.reflect.Field>
+        val functions: Map<String, List<java.lang.reflect.Method>>
+        val constructors: List<java.lang.reflect.Constructor<*>>
+        init {
+            val propMap = mutableMapOf<String, java.lang.reflect.Method>()
+            val fieldMap = mutableMapOf<String, java.lang.reflect.Field>()
+            val funcMap = mutableMapOf<String, MutableList<java.lang.reflect.Method>>()
+            
+            for (method in javaClass.methods) {
+                var name = method.name
+                val dashIndex = name.indexOf('-')
+                if (dashIndex != -1) {
+                    name = name.substring(0, dashIndex)
+                }
+                
+                if (method.parameterTypes.isEmpty() && name.startsWith("get") && name.length > 3) {
+                    val propName = name[3].lowercaseChar() + name.substring(4)
+                    propMap[propName] = method
+                } else if (method.parameterTypes.isEmpty() && name.startsWith("is") && name.length > 2) {
+                    val propName = name[2].lowercaseChar() + name.substring(3)
+                    propMap[propName] = method
+                }
+                
+                funcMap.getOrPut(name) { mutableListOf() }.add(method)
+            }
+            for (field in javaClass.fields) {
+                fieldMap[field.name] = field
+            }
+            properties = propMap
+            fields = fieldMap
+            functions = funcMap
+            constructors = javaClass.constructors.toList()
+        }
+    }
+    
+    private val javaClassReflectionCache = java.util.concurrent.ConcurrentHashMap<Class<*>, ClassReflectionCache>()
+
+    private fun getReflectionCache(javaClass: Class<*>): ClassReflectionCache {
+        return javaClassReflectionCache.getOrPut(javaClass) {
+            val cache = ClassReflectionCache(javaClass)
+            android.util.Log.e("LUA_REFLECTION", "Cached reflection for: ${javaClass.name}, total cache size: ${javaClassReflectionCache.size}")
+            cache
+        }
     }
 
     fun wrapObject(obj: Any): ScriptValue {
@@ -252,40 +313,37 @@ object ComposeBridge {
         instanceMeta.set("__index", engine.createFunction { args ->
             val key = args[1].toStringValue()
             try {
-                val kClass = obj::class
-                val prop = kClass.members.find { it.name == key } as? kotlin.reflect.KProperty1<Any, *>
+                val cache = getReflectionCache(obj.javaClass)
+                
+                val prop = cache.properties[key]
                 if (prop != null) {
-                    return@createFunction javaToScript(prop.getter.call(obj))
+                    return@createFunction javaToScript(prop.invoke(obj))
+                }
+                val field = cache.fields[key]
+                if (field != null) {
+                    return@createFunction javaToScript(field.get(obj))
                 }
                 
-                val funcs = kClass.members.filter { it.name == key && it is kotlin.reflect.KFunction<*> } as List<kotlin.reflect.KFunction<*>>
-                if (funcs.isNotEmpty()) {
+                val funcs = cache.functions[key]
+                if (!funcs.isNullOrEmpty()) {
                     return@createFunction engine.createFunction { funcArgs ->
                         try {
                             val isSelf = funcArgs.getOrNull(0)?.isTable() == true && !funcArgs.getOrNull(0)!!.asTable().get("_javaObj").isNil() && funcArgs.getOrNull(0)!!.asTable().get("_javaObj").asUserdata() === obj
                             val expectedLuaArgs = funcArgs.size - (if (isSelf) 1 else 0)
                             val targetFunc = funcs.find { f -> 
-                                f.parameters.count { it.kind != kotlin.reflect.KParameter.Kind.INSTANCE } == expectedLuaArgs
+                                f.parameterCount == expectedLuaArgs
                             } ?: funcs.first()
                             
-                            val kotlinArgs = mutableListOf<Any?>()
-                            var luaArgIndex = 0
-                            for (param in targetFunc.parameters) {
-                                if (param.kind == kotlin.reflect.KParameter.Kind.INSTANCE) {
-                                    kotlinArgs.add(obj)
-                                } else {
-                                    val scriptArg = funcArgs.getOrNull(luaArgIndex)
-                                    if (scriptArg != null && scriptArg.isTable() && !scriptArg.asTable().get("_javaObj").isNil() && scriptArg.asTable().get("_javaObj").asUserdata() === obj) {
-                                        luaArgIndex++
-                                    }
-                                    val nextArg = funcArgs.getOrNull(luaArgIndex++)
-                                    kotlinArgs.add(coerceArg(scriptToJava(nextArg), param.type))
-                                }
+                            val javaArgs = mutableListOf<Any?>()
+                            var luaArgIndex = if (isSelf) 1 else 0
+                            for (paramType in targetFunc.parameterTypes) {
+                                val nextArg = funcArgs.getOrNull(luaArgIndex++)
+                                javaArgs.add(coerceArg(scriptToJava(nextArg), paramType))
                             }
-                            val result = targetFunc.call(*kotlinArgs.toTypedArray())
+                            val result = targetFunc.invoke(obj, *javaArgs.toTypedArray())
                             return@createFunction javaToScript(result)
                         } catch (e: Exception) {
-                            android.util.Log.e("LUA_REFLECTION", "Error calling $key on obj class ${obj::class}", e)
+                            android.util.Log.e("LUA_REFLECTION", "Error calling $key on obj class ${obj.javaClass}", e)
                         }
                         engine.createNil()
                     }
@@ -299,77 +357,82 @@ object ComposeBridge {
         return instance
     }
 
-    fun wrapClass(kClass: kotlin.reflect.KClass<*>): ScriptValue {
+    private val Class<*>.objectInstance: Any?
+        get() = try {
+            this.getDeclaredField("INSTANCE").get(null)
+        } catch (e: Exception) {
+            null
+        }
+
+    private val Class<*>.companionObjectInstance: Any?
+        get() = try {
+            this.getDeclaredField("Companion").get(null)
+        } catch (e: Exception) {
+            null
+        }
+
+    fun wrapClass(javaClass: Class<*>): ScriptValue {
         val classTable = engine.createTable()
         val classMeta = engine.createTable()
         
         classMeta.set("__index", engine.createFunction { args ->
             val key = args[1].toStringValue()
-            val staticObj = kClass.objectInstance ?: kClass.companionObjectInstance
+            val staticObj = javaClass.objectInstance ?: javaClass.companionObjectInstance
             if (staticObj != null) {
-                if (key == "spacedBy") {
-                    android.util.Log.d("LUA_REFLECTION", "spacedBy requested on ${staticObj::class}. Members: ${staticObj::class.members.map { it.name }}")
-                }
                 try {
-                    val prop = staticObj::class.members.find { it.name == key } as? kotlin.reflect.KProperty1<Any, *>
+                    val cache = getReflectionCache(staticObj.javaClass)
+                    val prop = cache.properties[key]
                     if (prop != null) {
-                        return@createFunction javaToScript(prop.getter.call(staticObj))
+                        return@createFunction javaToScript(prop.invoke(staticObj))
                     }
-                    val funcs = staticObj::class.members.filter { it.name == key && it is kotlin.reflect.KFunction<*> } as List<kotlin.reflect.KFunction<*>>
-                    android.util.Log.d("LUA_REFLECTION", "Found ${funcs.size} KFunctions for key $key")
-                    if (funcs.isNotEmpty()) {
+                    val field = cache.fields[key]
+                    if (field != null) {
+                        return@createFunction javaToScript(field.get(staticObj))
+                    }
+                    val funcs = cache.functions[key]
+                    if (!funcs.isNullOrEmpty()) {
                         return@createFunction engine.createFunction { funcArgs ->
                             try {
-                                // Simple overload resolution based on arg count
                                 val isSelf = funcArgs.getOrNull(0)?.isTable() == true && !funcArgs.getOrNull(0)!!.asTable().get("_javaObj").isNil() && funcArgs.getOrNull(0)!!.asTable().get("_javaObj").asUserdata() === staticObj
                                 val expectedLuaArgs = funcArgs.size - (if (isSelf) 1 else 0)
                                 val targetFunc = funcs.find { f -> 
-                                    f.parameters.count { it.kind != kotlin.reflect.KParameter.Kind.INSTANCE } == expectedLuaArgs
+                                    f.parameterCount == expectedLuaArgs
                                 } ?: funcs.first()
                                 
-                                val kotlinArgs = mutableListOf<Any?>()
-                                var luaArgIndex = 0
-                                for (param in targetFunc.parameters) {
-                                    if (param.kind == kotlin.reflect.KParameter.Kind.INSTANCE) {
-                                        kotlinArgs.add(staticObj)
-                                    } else {
-                                        val scriptArg = funcArgs.getOrNull(luaArgIndex)
-                                        if (scriptArg != null && scriptArg.isTable() && !scriptArg.asTable().get("_javaObj").isNil() && scriptArg.asTable().get("_javaObj").asUserdata() === staticObj) {
-                                            luaArgIndex++
-                                        }
-                                        val nextArg = funcArgs.getOrNull(luaArgIndex++)
-                                        kotlinArgs.add(coerceArg(scriptToJava(nextArg), param.type))
-                                    }
+                                val javaArgs = mutableListOf<Any?>()
+                                var luaArgIndex = if (isSelf) 1 else 0
+                                for (paramType in targetFunc.parameterTypes) {
+                                    val nextArg = funcArgs.getOrNull(luaArgIndex++)
+                                    javaArgs.add(coerceArg(scriptToJava(nextArg), paramType))
                                 }
-                                val result = targetFunc.call(*kotlinArgs.toTypedArray())
+                                val result = targetFunc.invoke(staticObj, *javaArgs.toTypedArray())
                                 return@createFunction javaToScript(result)
                             } catch (e: Exception) {
-                                android.util.Log.e("LUA_REFLECTION", "Error calling $key on class ${staticObj::class}", e)
+                                android.util.Log.e("LUA_REFLECTION", "Error calling $key on class ${staticObj.javaClass}", e)
                             }
                             engine.createNil()
                         }
                     }
                 } catch(e: Exception) { e.printStackTrace() }
-            } else {
-                android.util.Log.d("LUA_REFLECTION", "staticObj is null for class: ${kClass.qualifiedName}, requested key: $key")
             }
             engine.createNil()
         })
         
         classMeta.set("__call", engine.createFunction { args ->
             try {
-                val constructor = kClass.constructors.find { it.parameters.size == args.size - 1 } ?: kClass.constructors.firstOrNull()
+                val cache = getReflectionCache(javaClass)
+                val constructor = cache.constructors.find { it.parameterCount == args.size - 1 } ?: cache.constructors.firstOrNull()
                 if (constructor != null) {
-                    val kotlinArgs = mutableListOf<Any?>()
+                    val javaArgs = mutableListOf<Any?>()
                     var luaArgIndex = 1 // 0 is the table itself
-                    for (param in constructor.parameters) {
+                    for (paramType in constructor.parameterTypes) {
                         val nextArg = args.getOrNull(luaArgIndex++)
-                        kotlinArgs.add(coerceArg(scriptToJava(nextArg), param.type))
+                        javaArgs.add(coerceArg(scriptToJava(nextArg), paramType))
                     }
-                    val instance = constructor.call(*kotlinArgs.toTypedArray())
+                    val instance = constructor.newInstance(*javaArgs.toTypedArray())
                     return@createFunction javaToScript(instance)
                 } else {
-                    val staticObj = kClass.objectInstance ?: kClass.companionObjectInstance
+                    val staticObj = javaClass.objectInstance ?: javaClass.companionObjectInstance
                     if (staticObj != null) {
                         return@createFunction javaToScript(staticObj)
                     }
@@ -392,10 +455,8 @@ object ComposeBridge {
             if (key.isNotEmpty() && key[0].isUpperCase()) {
                 try {
                     val className = if (!fullPath.startsWith("androidx.compose.")) "androidx.compose.$fullPath" else fullPath
-                    val clazz = Class.forName(className).kotlin
-                    val wrapped = wrapClass(clazz)
-                    nsTable.set(key, wrapped) 
-                    return@createFunction wrapped
+                    val clazz = Class.forName(className)
+                    return@createFunction wrapClass(clazz)
                 } catch (e: Exception) {
                     
                 }
@@ -539,8 +600,16 @@ class ComposeScope(var contentFunc: ScriptFunction) {
         try {
             contentFunc.call(*args)
         } catch (e: Exception) {
-            e.printStackTrace()
-            val errorMsg = "Script Error: ${e.message}\n\n${android.util.Log.getStackTraceString(e)}"
+            val stackTraceStr = e.stackTrace.take(50).joinToString("\n") { "\tat $it" } + if (e.stackTrace.size > 50) "\n\t... ${e.stackTrace.size - 50} more" else ""
+            var fullStr = "${e.javaClass.name}: ${e.message}\n$stackTraceStr"
+            var cause = e.cause
+            while (cause != null) {
+                val causeStack = cause.stackTrace.take(50).joinToString("\n") { "\tat $it" } + if (cause.stackTrace.size > 50) "\n\t... ${cause.stackTrace.size - 50} more" else ""
+                fullStr += "\nCaused by: ${cause.javaClass.name}: ${cause.message}\n$causeStack"
+                cause = cause.cause
+            }
+            android.util.Log.e("LUA_ERROR", fullStr)
+            val errorMsg = "Script Error: ${e.message}\n\n$fullStr"
             rootNodes.add(
                 ComposeNode(
                     "LuaError", // Keeping name for compatibility with renderer

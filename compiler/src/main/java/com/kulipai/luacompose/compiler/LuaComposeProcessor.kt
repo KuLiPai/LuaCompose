@@ -153,11 +153,15 @@ class LuaComposeProcessor(
                                 |        val val_$pName = props["$pName"]
                                 |        if (val_$pName is com.kulipai.luacompose.compose.script.ScriptFunction && method.parameterTypes[$i].name.startsWith("kotlin.jvm.functions.Function")) {
                                 |            val scopeToUse = if ($isComposable) com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()?.getOrCreateChildScope(val_$pName) else null
-                                |            args[$i] = com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(scopeToUse, val_$pName, method.parameterTypes[$i].name, $isComposable)
+                                |            args[$i] = androidx.compose.runtime.remember(scopeToUse, val_$pName) {
+                                |                com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(scopeToUse, val_$pName, method.parameterTypes[$i].name, $isComposable)
+                                |            }
                                 |        } else if (props.containsKey("$pName")) {
                                 |            args[$i] = $resolveCall
                                 |        } else if ("$pName" == "content" && childScope != null) {
-                                |            args[$i] = com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(childScope, null, method.parameterTypes[$i].name, true)
+                                |            args[$i] = androidx.compose.runtime.remember(childScope) {
+                                |                com.kulipai.luacompose.compose.runtime.FunctionWrappers.wrap(childScope, null, method.parameterTypes[$i].name, true)
+                                |            }
                                 |        } else {
                                 |            val defaultMaskIndex = $i / 31
                                 |            defaultBitmasks[defaultMaskIndex] = defaultBitmasks[defaultMaskIndex] or (1 shl ($i % 31))

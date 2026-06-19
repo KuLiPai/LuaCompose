@@ -40,7 +40,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation("org.jetbrains.kotlin:kotlin-reflect") // added kotlin-reflect
+    implementation(libs.kotlin.reflect) // added kotlin-reflect
     debugImplementation(libs.androidx.compose.ui.tooling)
 
 

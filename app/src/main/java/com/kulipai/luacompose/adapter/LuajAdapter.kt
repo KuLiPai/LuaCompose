@@ -28,9 +28,12 @@ class LuajValue(val luajObj: LuaValue) : ScriptValue {
     override fun toInt() = luajObj.toint()
     override fun toLong() = luajObj.tolong()
     override fun toDouble() = luajObj.todouble()
-    override fun toFloat() = luajObj.tofloat()
-    override fun toStringValue() = luajObj.tojstring()
+    override fun toFloat(): Float = luajObj.tofloat()
+    override fun toStringValue(): String = luajObj.tojstring()
     
+    override val stableId: Int
+        get() = System.identityHashCode(luajObj)
+        
     override fun asTable(): ScriptTable = LuajTable(luajObj.checktable())
     override fun asFunction(): ScriptFunction = LuajFunction(luajObj.checkfunction())
     override fun asUserdata(): Any? = luajObj.touserdata()
@@ -45,6 +48,16 @@ class LuajTable(val luajTable: org.luaj.LuaTable) : ScriptTable, ScriptValue by 
     override fun set(key: String, value: ScriptValue) { luajTable.set(key, value.toLuaj()) }
     override fun set(index: Int, value: ScriptValue) { luajTable.set(index, value.toLuaj()) }
     override fun set(key: ScriptValue, value: ScriptValue) { luajTable.set(key.toLuaj(), value.toLuaj()) }
+    
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is LuajTable) return false
+        return luajTable === other.luajTable
+    }
+
+    override fun hashCode(): Int {
+        return luajTable.hashCode()
+    }
     
     override fun length(): Int = luajTable.length()
     override fun keys(): List<ScriptValue> {

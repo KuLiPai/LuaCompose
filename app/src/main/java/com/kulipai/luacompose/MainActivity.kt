@@ -33,6 +33,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+
         setContent {
             LuaComposeTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
@@ -54,6 +56,7 @@ fun LuaAppRunner(context: Context) {
     // 当 reloadTrigger 变化时，重新从 SD 卡加载 Lua 代码
     LaunchedEffect(reloadTrigger) {
         try {
+    
             errorMessage = null
             rootScope = loadLuaScope(context)
         } catch (e: Exception) {

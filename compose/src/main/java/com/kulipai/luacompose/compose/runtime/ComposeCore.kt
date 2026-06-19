@@ -201,6 +201,7 @@ object ComposeBridge {
         val keys = table.keys()
         for (key in keys) {
             val kStr = key.toStringValue()
+            if (kStr == "_javaObj") continue
             try {
                 map[kStr] = scriptToJava(table.get(key), visited, depth + 1)
             } catch (e: StackOverflowError) {
@@ -277,9 +278,11 @@ object ComposeBridge {
                 if (method.parameterTypes.isEmpty() && name.startsWith("get") && name.length > 3) {
                     val propName = name[3].lowercaseChar() + name.substring(4)
                     propMap[propName] = method
+                    propMap[name.substring(3)] = method
                 } else if (method.parameterTypes.isEmpty() && name.startsWith("is") && name.length > 2) {
                     val propName = name[2].lowercaseChar() + name.substring(3)
                     propMap[propName] = method
+                    propMap[name.substring(2)] = method
                 }
                 
                 funcMap.getOrPut(name) { mutableListOf() }.add(method)

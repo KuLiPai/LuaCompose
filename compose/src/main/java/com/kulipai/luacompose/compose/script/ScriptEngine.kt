@@ -16,6 +16,8 @@ interface ScriptValue {
     fun toFloat(): Float
     fun toStringValue(): String
     
+    val stableId: Int
+    
     fun asTable(): ScriptTable
     fun asFunction(): ScriptFunction
     fun asUserdata(): Any?

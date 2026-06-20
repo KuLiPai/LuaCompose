@@ -24,7 +24,12 @@ android {
         compose = true
     }
 
-
+    sourceSets {
+        getByName("main") {
+            java.srcDir("build/generated/ksp/debug/kotlin")
+            java.srcDir("build/generated/ksp/release/kotlin")
+        }
+    }
 }
 
 dependencies {
@@ -33,7 +38,7 @@ dependencies {
     implementation(libs.androidx.compose.material3)
 
     implementation(project(":annotations"))
-    ksp(project(":compiler"))
+    // ksp(project(":compiler"))
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)

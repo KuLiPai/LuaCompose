@@ -158,22 +158,18 @@ class AnimationCorePlugin : ComposeScriptPlugin {
                 if (!spec.isNil()) animSpec = spec
                 val rm = t.get("repeatMode")
                 if (!rm.isNil()) {
-                    if (rm.isString()) repeatModeStr = rm.toStringValue()
-                    else if (rm.isUserdata()) {
-                        val ud = rm.asUserdata()
-                        if (ud is RepeatMode) repeatModeStr = ud.name
-                    }
+                    val jObj = ComposeBridge.scriptToJava(rm)
+                    if (jObj is String) repeatModeStr = jObj
+                    else if (jObj is RepeatMode) repeatModeStr = jObj.name
                 }
             } else {
                 val spec = args.getOrNull(0)
                 if (spec != null && !spec.isNil()) animSpec = spec
                 val rm = args.getOrNull(1)
                 if (rm != null && !rm.isNil()) {
-                    if (rm.isString()) repeatModeStr = rm.toStringValue()
-                    else if (rm.isUserdata()) {
-                        val ud = rm.asUserdata()
-                        if (ud is RepeatMode) repeatModeStr = ud.name
-                    }
+                    val jObj = ComposeBridge.scriptToJava(rm)
+                    if (jObj is String) repeatModeStr = jObj
+                    else if (jObj is RepeatMode) repeatModeStr = jObj.name
                 }
             }
 

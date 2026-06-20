@@ -356,6 +356,37 @@ object ComposeBridge {
             }
             engine.createNil()
         })
+        
+        instanceMeta.set("__newindex", engine.createFunction { args ->
+            val key = args[1].toStringValue()
+            val value = args[2]
+            try {
+                val cache = getReflectionCache(obj.javaClass)
+                
+                // Try setter method: setPropName
+                val setterName = "set" + key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                val setterFuncs = cache.functions[setterName]
+                if (!setterFuncs.isNullOrEmpty()) {
+                    val targetFunc = setterFuncs.first()
+                    val paramType = targetFunc.parameterTypes[0]
+                    val javaArg = coerceArg(scriptToJava(value), paramType)
+                    targetFunc.invoke(obj, javaArg)
+                    return@createFunction engine.createNil()
+                }
+                
+                // Try to set field directly
+                val field = cache.fields[key]
+                if (field != null) {
+                    val javaArg = coerceArg(scriptToJava(value), field.type)
+                    field.set(obj, javaArg)
+                    return@createFunction engine.createNil()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("LUA_REFLECTION", "Error setting $key on obj class ${obj.javaClass}", e)
+            }
+            engine.createNil()
+        })
+        
         instance.setMetatable(instanceMeta)
         return instance
     }
@@ -418,6 +449,16 @@ object ComposeBridge {
                     }
                 } catch(e: Exception) { e.printStackTrace() }
             }
+            
+            // Fallback for Enums and static fields directly on the class
+            try {
+                val cache = getReflectionCache(javaClass)
+                val field = cache.fields[key]
+                if (field != null && java.lang.reflect.Modifier.isStatic(field.modifiers)) {
+                    return@createFunction javaToScript(field.get(null))
+                }
+            } catch(e: Exception) { e.printStackTrace() }
+            
             engine.createNil()
         })
         

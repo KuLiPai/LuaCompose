@@ -10,9 +10,7 @@ import androidx.core.graphics.toColorInt
 @SuppressLint("ModifierFactoryExtensionFunction")
 fun resolveModifier(propRaw: Any?): Modifier {
     val prop = com.kulipai.luacompose.compose.runtime.ComposeBridge.unwrapAny(propRaw)
-    if (prop is LuaModifier) {
-        android.util.Log.e("LUAMODIFIER_LOG", "resolveModifier string: " + prop.modifier.toString())
-    }
+    // Log removed to prevent spam
     return when (prop) {
         is LuaModifier -> prop.modifier
         is Modifier -> prop

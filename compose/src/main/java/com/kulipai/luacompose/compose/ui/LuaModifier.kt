@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -88,12 +89,51 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxSize(); return this
     }
 
+    fun fillMaxSize(fractionRaw: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(fractionRaw)
+        var fraction = 1f
+        if (unwrapped is Map<*, *>) {
+            val f = unwrapped["fraction"] ?: unwrapped[1.0] ?: unwrapped[1]
+            if (f is Number) fraction = f.toFloat()
+        } else if (unwrapped is Number) {
+            fraction = unwrapped.toFloat()
+        }
+        modifier = modifier.fillMaxSize(fraction)
+        return this
+    }
+
     fun fillMaxWidth(): LuaModifier {
         modifier = modifier.fillMaxWidth(); return this
     }
 
+    fun fillMaxWidth(fractionRaw: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(fractionRaw)
+        var fraction = 1f
+        if (unwrapped is Map<*, *>) {
+            val f = unwrapped["fraction"] ?: unwrapped[1.0] ?: unwrapped[1]
+            if (f is Number) fraction = f.toFloat()
+        } else if (unwrapped is Number) {
+            fraction = unwrapped.toFloat()
+        }
+        modifier = modifier.fillMaxWidth(fraction)
+        return this
+    }
+
     fun fillMaxHeight(): LuaModifier {
         modifier = modifier.fillMaxHeight(); return this
+    }
+
+    fun fillMaxHeight(fractionRaw: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(fractionRaw)
+        var fraction = 1f
+        if (unwrapped is Map<*, *>) {
+            val f = unwrapped["fraction"] ?: unwrapped[1.0] ?: unwrapped[1]
+            if (f is Number) fraction = f.toFloat()
+        } else if (unwrapped is Number) {
+            fraction = unwrapped.toFloat()
+        }
+        modifier = modifier.fillMaxHeight(fraction)
+        return this
     }
 
     fun size(size: Any): LuaModifier {
@@ -356,6 +396,18 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return internalPointerInput(arrayOf(ComposeBridge.unwrapAny(key1), ComposeBridge.unwrapAny(key2), ComposeBridge.unwrapAny(key3)), blockValueRaw)
     }
 
+    fun pointerInput(key1: Any, key2: Any, key3: Any, key4: Any, blockValueRaw: Any): LuaModifier {
+        return internalPointerInput(arrayOf(ComposeBridge.unwrapAny(key1), ComposeBridge.unwrapAny(key2), ComposeBridge.unwrapAny(key3), ComposeBridge.unwrapAny(key4)), blockValueRaw)
+    }
+
+    fun pointerInput(key1: Any, key2: Any, key3: Any, key4: Any, key5: Any, blockValueRaw: Any): LuaModifier {
+        return internalPointerInput(arrayOf(ComposeBridge.unwrapAny(key1), ComposeBridge.unwrapAny(key2), ComposeBridge.unwrapAny(key3), ComposeBridge.unwrapAny(key4), ComposeBridge.unwrapAny(key5)), blockValueRaw)
+    }
+
+    fun pointerInput(key1: Any, key2: Any, key3: Any, key4: Any, key5: Any, key6: Any, blockValueRaw: Any): LuaModifier {
+        return internalPointerInput(arrayOf(ComposeBridge.unwrapAny(key1), ComposeBridge.unwrapAny(key2), ComposeBridge.unwrapAny(key3), ComposeBridge.unwrapAny(key4), ComposeBridge.unwrapAny(key5), ComposeBridge.unwrapAny(key6)), blockValueRaw)
+    }
+
     private fun internalPointerInput(keys: Array<Any?>, blockValueRaw: Any): LuaModifier {
         val blockValue = if (blockValueRaw is ScriptValue) blockValueRaw else ComposeBridge.engine.coerceJavaToScript(blockValueRaw)
         val block = if (blockValue.isFunction()) blockValue.asFunction() else null
@@ -582,6 +634,51 @@ class LuaModifier(var modifier: Modifier = Modifier) {
 
     fun scale(scaleX: Float, scaleY: Float): LuaModifier {
         modifier = modifier.scale(scaleX, scaleY); return this
+    }
+
+    fun graphicsLayer(blockRaw: Any): LuaModifier {
+        val blockValue = if (blockRaw is ScriptValue) blockRaw else ComposeBridge.engine.coerceJavaToScript(blockRaw)
+        if (blockValue.isFunction()) {
+            val block = blockValue.asFunction()
+            modifier = modifier.graphicsLayer {
+                val scopeTable = ComposeBridge.javaToScript(this)
+                try {
+                    block.call(scopeTable)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        } else {
+            // Also support passing a table to configure properties without a function
+            val unwrapped = ComposeBridge.unwrapAny(blockRaw)
+            if (unwrapped is Map<*, *>) {
+                modifier = modifier.graphicsLayer {
+                    val scopeTable = ComposeBridge.javaToScript(this)
+                    for ((k, v) in unwrapped) {
+                        try {
+                            // Try to set using the newly added __newindex mechanism
+                            val key = k.toString()
+                            val javaVal = ComposeBridge.scriptToJava(ComposeBridge.engine.coerceJavaToScript(v))
+                            
+                            val setterName = "set" + key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                            val setter = this.javaClass.methods.find { it.name == setterName && it.parameterCount == 1 }
+                            if (setter != null) {
+                                val paramType = setter.parameterTypes[0]
+                                val convertedArg = if (javaVal is Number && paramType == Float::class.java) {
+                                    javaVal.toFloat()
+                                } else {
+                                    javaVal
+                                }
+                                setter.invoke(this, convertedArg)
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            }
+        }
+        return this
     }
 
 

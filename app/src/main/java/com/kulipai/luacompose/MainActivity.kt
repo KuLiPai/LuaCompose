@@ -129,27 +129,6 @@ fun loadLuaScope(context: Context): ComposeScope {
         val env = LuajEngine.wrap(globals).asTable()
         LuaComposeLib.inject(env)
 
-        runCatching {
-            val preflight = globals.load(
-                """
-                local compose = compose
-                local foundation = compose.foundation
-                local layout = foundation and foundation.layout
-                local material3 = compose.material3
-                return
-                    layout ~= nil and layout.Column ~= nil,
-                    foundation ~= nil and foundation.Canvas ~= nil,
-                    material3 ~= nil and material3.Text ~= nil
-                """.trimIndent(),
-                "preflight.lua"
-            ).invoke()
-            Log.d(
-                "LUA_PREFLIGHT",
-                "Column=${preflight.arg1().toboolean()} Canvas=${preflight.arg(2).toboolean()} Text=${preflight.arg(3).toboolean()}"
-            )
-        }.onFailure {
-            Log.e("LUA_PREFLIGHT", "preflight failed", it)
-        }
 
         // 3. 注册 Modifier 全局对象
         globals.set("Modifier", object : ZeroArgFunction() {

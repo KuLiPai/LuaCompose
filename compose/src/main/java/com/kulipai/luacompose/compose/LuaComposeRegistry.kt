@@ -131,7 +131,33 @@ fun createComposeDrawScope(drawScope: DrawScope): ScriptTable {
         )
         ComposeBridge.engine.createNil()
     })
-    
+
+    table.set("drawLine", ComposeBridge.engine.createFunction { args ->
+        val mapArgs = args[0].asTable()
+        val color = resolveColor(ComposeBridge.scriptToJava(mapArgs.get("color")))
+        val startVal = mapArgs.get("start")
+        val endVal = mapArgs.get("end")
+        val strokeWidthVal = mapArgs.get("strokeWidth")
+
+        val start = if (startVal != null && !startVal.isNil()) {
+            startVal.asTable().get("_javaOffset").asUserdata() as Offset
+        } else Offset.Zero
+
+        val end = if (endVal != null && !endVal.isNil()) {
+            endVal.asTable().get("_javaOffset").asUserdata() as Offset
+        } else Offset.Zero
+
+        val strokeWidth = if (!strokeWidthVal.isNil()) strokeWidthVal.toFloat() else 1f
+
+        drawScope.drawLine(
+            color = color,
+            start = start,
+            end = end,
+            strokeWidth = strokeWidth,
+        )
+        ComposeBridge.engine.createNil()
+    })
+
     table.set("drawPath", ComposeBridge.engine.createFunction { args ->
         val mapArgs = args[0].asTable()
         val color = resolveColor(ComposeBridge.scriptToJava(mapArgs.get("color")))

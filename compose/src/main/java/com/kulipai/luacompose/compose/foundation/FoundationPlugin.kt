@@ -1,6 +1,7 @@
 package com.kulipai.luacompose.compose.foundation
 
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -149,24 +150,51 @@ class FoundationPlugin : ComposeScriptPlugin {
         gesturesTable.set("detectDragGestures", ComposeBridge.engine.createFunction { args ->
             val actions = ComposeBridge.getActivePointerInputScopeActions() ?: return@createFunction ComposeBridge.engine.createNil()
             
-            var onDrag: com.kulipai.luacompose.compose.script.ScriptFunction? = null
+            var onDragStart: com.kulipai.luacompose.compose.script.ScriptFunction? = null
             var onDragEnd: com.kulipai.luacompose.compose.script.ScriptFunction? = null
+            var onDragCancel: com.kulipai.luacompose.compose.script.ScriptFunction? = null
+            var onDrag: com.kulipai.luacompose.compose.script.ScriptFunction? = null
             
             val arg1 = args.getOrNull(0)
             if (arg1 != null && arg1.isTable()) {
                 val t = arg1.asTable()
-                val od = t.get("onDrag")
-                if (od.isFunction()) onDrag = od.asFunction()
+                val ods = t.get("onDragStart")
+                if (ods.isFunction()) onDragStart = ods.asFunction()
                 val ode = t.get("onDragEnd")
                 if (ode.isFunction()) onDragEnd = ode.asFunction()
+                val odc = t.get("onDragCancel")
+                if (odc.isFunction()) onDragCancel = odc.asFunction()
+                val od = t.get("onDrag")
+                if (od.isFunction()) onDrag = od.asFunction()
             }
             
             actions.add {
                 detectDragGestures(
+                    onDragStart = { offset ->
+                        if (onDragStart != null) {
+                            try {
+                                val offsetTable = ComposeBridge.engine.createTable()
+                                offsetTable.set("x", ComposeBridge.engine.createValue(offset.x.toDouble()))
+                                offsetTable.set("y", ComposeBridge.engine.createValue(offset.y.toDouble()))
+                                onDragStart!!.call(offsetTable)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    },
                     onDragEnd = {
                         if (onDragEnd != null) {
                             try {
                                 onDragEnd!!.call()
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        if (onDragCancel != null) {
+                            try {
+                                onDragCancel!!.call()
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
@@ -188,6 +216,77 @@ class FoundationPlugin : ComposeScriptPlugin {
                                 e.printStackTrace()
                             }
                         }
+                    }
+                )
+            }
+            ComposeBridge.engine.createNil()
+        })
+        
+        gesturesTable.set("detectTapGestures", ComposeBridge.engine.createFunction { args ->
+            val actions = ComposeBridge.getActivePointerInputScopeActions() ?: return@createFunction ComposeBridge.engine.createNil()
+            
+            var onTap: com.kulipai.luacompose.compose.script.ScriptFunction? = null
+            var onDoubleTap: com.kulipai.luacompose.compose.script.ScriptFunction? = null
+            var onLongPress: com.kulipai.luacompose.compose.script.ScriptFunction? = null
+            var onPress: com.kulipai.luacompose.compose.script.ScriptFunction? = null
+            
+            val arg1 = args.getOrNull(0)
+            if (arg1 != null && arg1.isTable()) {
+                val t = arg1.asTable()
+                val ot = t.get("onTap")
+                if (ot.isFunction()) onTap = ot.asFunction()
+                val odt = t.get("onDoubleTap")
+                if (odt.isFunction()) onDoubleTap = odt.asFunction()
+                val olp = t.get("onLongPress")
+                if (olp.isFunction()) onLongPress = olp.asFunction()
+                val op = t.get("onPress")
+                if (op.isFunction()) onPress = op.asFunction()
+            }
+            
+            actions.add {
+                detectTapGestures(
+                    onTap = onTap?.let { fn ->
+                        { offset: androidx.compose.ui.geometry.Offset ->
+                            try {
+                                val offsetTable = ComposeBridge.engine.createTable()
+                                offsetTable.set("x", ComposeBridge.engine.createValue(offset.x.toDouble()))
+                                offsetTable.set("y", ComposeBridge.engine.createValue(offset.y.toDouble()))
+                                fn.call(offsetTable)
+                            } catch (e: Exception) { e.printStackTrace() }
+                        }
+                    },
+                    onDoubleTap = onDoubleTap?.let { fn ->
+                        { offset: androidx.compose.ui.geometry.Offset ->
+                            try {
+                                val offsetTable = ComposeBridge.engine.createTable()
+                                offsetTable.set("x", ComposeBridge.engine.createValue(offset.x.toDouble()))
+                                offsetTable.set("y", ComposeBridge.engine.createValue(offset.y.toDouble()))
+                                fn.call(offsetTable)
+                            } catch (e: Exception) { e.printStackTrace() }
+                        }
+                    },
+                    onLongPress = onLongPress?.let { fn ->
+                        { offset: androidx.compose.ui.geometry.Offset ->
+                            try {
+                                val offsetTable = ComposeBridge.engine.createTable()
+                                offsetTable.set("x", ComposeBridge.engine.createValue(offset.x.toDouble()))
+                                offsetTable.set("y", ComposeBridge.engine.createValue(offset.y.toDouble()))
+                                fn.call(offsetTable)
+                            } catch (e: Exception) { e.printStackTrace() }
+                        }
+                    },
+                    onPress = if (onPress != null) {
+                        val block: suspend androidx.compose.foundation.gestures.PressGestureScope.(androidx.compose.ui.geometry.Offset) -> Unit = { offset ->
+                            try {
+                                val offsetTable = ComposeBridge.engine.createTable()
+                                offsetTable.set("x", ComposeBridge.engine.createValue(offset.x.toDouble()))
+                                offsetTable.set("y", ComposeBridge.engine.createValue(offset.y.toDouble()))
+                                onPress!!.call(offsetTable)
+                            } catch (e: Exception) { e.printStackTrace() }
+                        }
+                        block
+                    } else {
+                        { _ -> }
                     }
                 )
             }

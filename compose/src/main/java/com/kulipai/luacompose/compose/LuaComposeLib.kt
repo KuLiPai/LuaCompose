@@ -74,6 +74,14 @@ object LuaComposeLib {
         val composeTable = ComposeBridge.createLazyNamespace("androidx.compose")
         env.set("compose", composeTable)
 
+        composeTable.set("delay", ComposeBridge.engine.createFunction { args ->
+            val ms = args[0].toLong()
+            kotlinx.coroutines.runBlocking {
+                kotlinx.coroutines.delay(ms)
+            }
+            ComposeBridge.engine.createNil()
+        })
+
         composeTable.set("dp", ComposeBridge.engine.createFunction { args ->
             ComposeBridge.javaToScript(resolveDp(ComposeBridge.scriptToJava(args[0])))
         })
@@ -122,6 +130,29 @@ object LuaComposeLib {
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
+                    }
+                }
+            }
+            ComposeBridge.engine.createNil()
+        })
+
+        composeTable.set("withFrameNanos", ComposeBridge.engine.createFunction { args ->
+            val callback = args[0]
+            if (callback.isFunction()) {
+                val activeScope = ComposeBridge.getActiveScope()
+                val clock = activeScope?.coroutineScope?.coroutineContext?.get(androidx.compose.runtime.MonotonicFrameClock)
+                
+                if (clock != null) {
+                    kotlinx.coroutines.runBlocking(clock) {
+                        androidx.compose.runtime.withFrameNanos { frameTime ->
+                            callback.asFunction().call(ComposeBridge.engine.createValue(frameTime.toDouble()))
+                        }
+                    }
+                } else {
+                    kotlinx.coroutines.runBlocking {
+                        kotlinx.coroutines.delay(16)
+                        val frameTime = System.nanoTime()
+                        callback.asFunction().call(ComposeBridge.engine.createValue(frameTime.toDouble()))
                     }
                 }
             }
@@ -236,7 +267,7 @@ object LuaComposeLib {
             table.set("launch", ComposeBridge.engine.createFunction { args ->
                 val block = args.getOrNull(0)
                 if (block != null && block.isFunction()) {
-                    coroutineScope.launch(Dispatchers.Main) {
+                    coroutineScope.launch(kotlinx.coroutines.Dispatchers.Default) {
                         try {
                             block.asFunction().call()
                         } catch (e: Exception) {
@@ -263,7 +294,7 @@ object LuaComposeLib {
                 val effectKey = "launched_effect_${keys.hashCode()}"
                 if (scope.effectStates[effectKey] == null) {
                     scope.effectStates[effectKey] = true
-                    scope.coroutineScope?.launch(Dispatchers.Main) {
+                    scope.coroutineScope?.launch(kotlinx.coroutines.Dispatchers.Default) {
                         try {
                             effectFunc.asFunction().call()
                         } catch (e: Exception) {

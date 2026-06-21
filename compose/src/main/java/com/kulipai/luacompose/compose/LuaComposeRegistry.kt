@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.drawscope.clipPath
 import com.kulipai.luacompose.generated.GeneratedPluginRegistry
 import com.kulipai.luacompose.compose.animation.AnimationPlugin
 import com.kulipai.luacompose.compose.foundation.FoundationPlugin
@@ -62,20 +63,37 @@ fun createComposeDrawScope(drawScope: DrawScope): ScriptTable {
     table.set("drawRect", ComposeBridge.engine.createFunction { args ->
         val mapArgs = args[0].asTable()
         val color = resolveColor(ComposeBridge.scriptToJava(mapArgs.get("color")))
+        val brushVal = mapArgs.get("brush")
+        val brush = if (!brushVal.isNil()) ComposeBridge.scriptToJava(brushVal) as? androidx.compose.ui.graphics.Brush else null
         val xVal = mapArgs.get("x")
         val yVal = mapArgs.get("y")
         val widthVal = mapArgs.get("width")
         val heightVal = mapArgs.get("height")
         val x = if (!xVal.isNil()) xVal.toFloat() else 0f
         val y = if (!yVal.isNil()) yVal.toFloat() else 0f
-        val width = if (!widthVal.isNil()) widthVal.toFloat() else 100f
-        val height = if (!heightVal.isNil()) heightVal.toFloat() else 100f
+        val sizeVal = mapArgs.get("size")
+        val finalSize = if (!sizeVal.isNil()) {
+            val sizeObj = sizeVal.asTable().get("_javaSize")
+            if (!sizeObj.isNil()) sizeObj.asUserdata() as androidx.compose.ui.geometry.Size else Size(drawScope.size.width, drawScope.size.height)
+        } else {
+            val width = if (!widthVal.isNil()) widthVal.toFloat() else drawScope.size.width
+            val height = if (!heightVal.isNil()) heightVal.toFloat() else drawScope.size.height
+            Size(width, height)
+        }
         
-        drawScope.drawRect(
-            color = color,
-            topLeft = Offset(x, y),
-            size = Size(width, height)
-        )
+        if (brush != null) {
+            drawScope.drawRect(
+                brush = brush,
+                topLeft = Offset(x, y),
+                size = finalSize
+            )
+        } else {
+            drawScope.drawRect(
+                color = color,
+                topLeft = Offset(x, y),
+                size = finalSize
+            )
+        }
         ComposeBridge.engine.createNil()
     })
     
@@ -163,19 +181,39 @@ fun createComposeDrawScope(drawScope: DrawScope): ScriptTable {
         val color = resolveColor(ComposeBridge.scriptToJava(mapArgs.get("color")))
         val scriptPath = mapArgs.get("path")
         
+        var pathObj: androidx.compose.ui.graphics.Path? = null
         if (scriptPath.isTable()) {
             val pathData = scriptPath.asTable().get("_javaPath")
             if (!pathData.isNil() && pathData.isUserdata()) {
-                val path = pathData.asUserdata() as androidx.compose.ui.graphics.Path
-                drawScope.drawPath(
-                    path = path,
-                    color = color
-                )
+                pathObj = pathData.asUserdata() as? androidx.compose.ui.graphics.Path
             }
+        } else if (scriptPath.isUserdata()) {
+            pathObj = scriptPath.asUserdata() as? androidx.compose.ui.graphics.Path
+        }
+
+        if (pathObj != null) {
+            drawScope.drawPath(
+                path = pathObj,
+                color = color
+            )
         }
         ComposeBridge.engine.createNil()
     })
     
+    
+    table.set("clipPath", ComposeBridge.engine.createFunction { args ->
+        val map = args[0].asTable()
+        val pathVal = map.get("path")
+        val block = map.get("block") as? com.kulipai.luacompose.compose.script.ScriptFunction
+        if (pathVal != null && !pathVal.isNil() && block != null) {
+            val path = pathVal.asTable().get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
+            drawScope.clipPath(path = path) {
+                block.call()
+            }
+        }
+        ComposeBridge.engine.createNil()
+    })
+
     table.set("rotate", ComposeBridge.engine.createFunction { args ->
         val map = args[0].asTable()
         val degreesVal = map.get("degrees")

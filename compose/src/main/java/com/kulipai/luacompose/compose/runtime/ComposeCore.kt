@@ -152,17 +152,17 @@ object ComposeBridge {
                 }
                 visited.add(visitedKey)
 
-                val isState = table.get("_isState")
-                val isColor = table.get("_javaColor")
-                val isDp = table.get("_javaDp")
-                val isSize = table.get("_javaSize")
-                val isOffset = table.get("_javaOffset")
-                val isIntOffset = table.get("_javaIntOffset")
-                val isStroke = table.get("_javaStroke")
-                val isJavaObj = table.get("_javaObj")
+                val isState = table.rawget("_isState")
+                val isColor = table.rawget("_javaColor")
+                val isDp = table.rawget("_javaDp")
+                val isSize = table.rawget("_javaSize")
+                val isOffset = table.rawget("_javaOffset")
+                val isIntOffset = table.rawget("_javaIntOffset")
+                val isStroke = table.rawget("_javaStroke")
+                val isJavaObj = table.rawget("_javaObj")
 
                 val result = if (isState.isBoolean() && isState.toBoolean()) {
-                    table.get("javaState").asUserdata()
+                    table.rawget("javaState").asUserdata()
                 } else if (isJavaObj.isUserdata()) {
                     isJavaObj.asUserdata()
                 } else if (isColor.isUserdata()) {
@@ -202,6 +202,9 @@ object ComposeBridge {
         for (key in keys) {
             val kStr = key.toStringValue()
             if (kStr == "_javaObj") continue
+            if (depth > 50) {
+                android.util.Log.e("LUA_COMPOSE", "Deep recursion depth=$depth, key=$kStr")
+            }
             try {
                 map[kStr] = scriptToJava(table.get(key), visited, depth + 1)
             } catch (e: StackOverflowError) {
@@ -365,12 +368,13 @@ object ComposeBridge {
                 
                 // Try setter method: setPropName
                 val setterName = "set" + key.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+                android.util.Log.d("LUA_REFLECTION", "Trying to set: " + key + " via " + setterName)
                 val setterFuncs = cache.functions[setterName]
                 if (!setterFuncs.isNullOrEmpty()) {
                     val targetFunc = setterFuncs.first()
                     val paramType = targetFunc.parameterTypes[0]
                     val javaArg = coerceArg(scriptToJava(value), paramType)
-                    targetFunc.invoke(obj, javaArg)
+                    try { targetFunc.invoke(obj, javaArg); android.util.Log.d("LUA_REFLECTION", "Successfully set " + setterName); } catch (e: Exception) { android.util.Log.e("LUA_REFLECTION", "Failed to set " + setterName, e); }
                     return@createFunction engine.createNil()
                 }
                 

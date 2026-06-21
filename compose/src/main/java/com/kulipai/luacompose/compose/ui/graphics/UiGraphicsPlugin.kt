@@ -2,9 +2,18 @@ package com.kulipai.luacompose.compose.ui.graphics
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -12,6 +21,7 @@ import com.kulipai.luacompose.compose.runtime.ComposeBridge
 import com.kulipai.luacompose.compose.createComposeDrawScope
 import com.kulipai.luacompose.compose.runtime.ComposeScope
 import com.kulipai.luacompose.compose.runtime.ComposeScriptPlugin
+import com.kulipai.luacompose.compose.ui.resolveColor
 import com.kulipai.luacompose.compose.ui.resolveModifier
 import com.kulipai.luacompose.compose.script.ScriptFunction
 import com.kulipai.luacompose.compose.script.ScriptTable
@@ -29,6 +39,45 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
     }
 
     override fun injectGlobals(scriptTable: ScriptTable) {
+        val brushTable = ComposeBridge.engine.createTable()
+        brushTable.set("radialGradient", ComposeBridge.engine.createFunction { args ->
+            val colorStopsTable = args[0].asTable()
+            val centerVal = args[1]
+            val radiusVal = args[2]
+
+            val colorStops = mutableListOf<Pair<Float, androidx.compose.ui.graphics.Color>>()
+            val keys = colorStopsTable.keys()
+            for (i in keys.indices) {
+                val key = keys[i]
+                val colorScriptVal = colorStopsTable.get(key)
+                val color = resolveColor(ComposeBridge.scriptToJava(colorScriptVal))
+                val fraction = if (key.isNumber()) key.toFloat() else 0f
+                colorStops.add(Pair(fraction, color))
+            }
+
+            val center = if (centerVal != null && !centerVal.isNil()) {
+                val tableCenter = centerVal.asTable()
+                val offsetObj = tableCenter.get("_javaOffset")
+                if (offsetObj != null && !offsetObj.isNil()) {
+                    offsetObj.asUserdata() as androidx.compose.ui.geometry.Offset
+                } else {
+                    androidx.compose.ui.geometry.Offset.Unspecified
+                }
+            } else {
+                androidx.compose.ui.geometry.Offset.Unspecified
+            }
+
+            val radius = if (radiusVal != null && !radiusVal.isNil()) radiusVal.toFloat() else Float.POSITIVE_INFINITY
+
+            val brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                *colorStops.toTypedArray(),
+                center = center,
+                radius = radius
+            )
+            ComposeBridge.javaToScript(brush)
+        })
+        scriptTable.set("Brush", brushTable)
+
         // -------------- Path ------------------
         ComposeBridge.converters[androidx.compose.ui.graphics.Path::class.java] = { obj ->
             val path = obj as androidx.compose.ui.graphics.Path
@@ -51,6 +100,25 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
                 path.close()
                 instance
             })
+            
+            instance.set("op", ComposeBridge.engine.createFunction { innerArgs ->
+                val startIdx = if (innerArgs.size > 0 && innerArgs[0].isTable() && !innerArgs[0].asTable().get("_javaPath").isNil()) 1 else 0
+                val path1Table = innerArgs[startIdx].asTable()
+                val path1 = path1Table.get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
+                val path2Table = innerArgs[startIdx + 1].asTable()
+                val path2 = path2Table.get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
+                val operation = innerArgs[startIdx + 2].toInt()
+                val pathOperation = when (operation) {
+                    0 -> androidx.compose.ui.graphics.PathOperation.Difference
+                    1 -> androidx.compose.ui.graphics.PathOperation.Intersect
+                    2 -> androidx.compose.ui.graphics.PathOperation.Union
+                    3 -> androidx.compose.ui.graphics.PathOperation.Xor
+                    4 -> androidx.compose.ui.graphics.PathOperation.ReverseDifference
+                    else -> androidx.compose.ui.graphics.PathOperation.Difference
+                }
+                val success = path.op(path1, path2, pathOperation)
+                ComposeBridge.engine.createValue(success)
+            })
             instance
         }
 
@@ -62,6 +130,14 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
         })
         pathCompanionTable.setMetatable(pathTableMeta)
         scriptTable.set("Path", pathCompanionTable)
+        
+        val pathOpTable = ComposeBridge.engine.createTable()
+        pathOpTable.set("Difference", ComposeBridge.engine.createValue(0))
+        pathOpTable.set("Intersect", ComposeBridge.engine.createValue(1))
+        pathOpTable.set("Union", ComposeBridge.engine.createValue(2))
+        pathOpTable.set("Xor", ComposeBridge.engine.createValue(3))
+        pathOpTable.set("ReverseDifference", ComposeBridge.engine.createValue(4))
+        scriptTable.set("PathOperation", pathOpTable)
         // -------------- Color ------------------
         ComposeBridge.converters[Color::class.java] = { obj ->
             val color = obj as Color
@@ -131,6 +207,51 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
         val colorTable = ComposeBridge.engine.createTable()
         colorTable.setMetatable(colorTableMeta)
         scriptTable.set("Color", colorTable)
+
+        val runtimeShaderTable = ComposeBridge.engine.createTable()
+        val runtimeShaderMeta = ComposeBridge.engine.createTable()
+        runtimeShaderMeta.set("__call", ComposeBridge.engine.createFunction { args ->
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                val shaderSrc = args[1].toStringValue()
+                val shader = android.graphics.RuntimeShader(shaderSrc)
+                val instance = ComposeBridge.engine.createTable()
+                instance.set("_javaRuntimeShader", ComposeBridge.engine.createUserdata(shader))
+                instance.set("setFloatUniform", ComposeBridge.engine.createFunction { innerArgs ->
+                    val startIdx = if (innerArgs.size > 0 && innerArgs[0].isTable() && !innerArgs[0].asTable().get("_javaRuntimeShader").isNil()) 1 else 0
+                    val name = innerArgs[startIdx].toStringValue()
+                    val count = innerArgs.size - startIdx - 1
+                    if (count == 1) {
+                        shader.setFloatUniform(name, innerArgs[startIdx + 1].toFloat())
+                    } else if (count == 2) {
+                        shader.setFloatUniform(name, innerArgs[startIdx + 1].toFloat(), innerArgs[startIdx + 2].toFloat())
+                    } else if (count == 3) {
+                        shader.setFloatUniform(name, innerArgs[startIdx + 1].toFloat(), innerArgs[startIdx + 2].toFloat(), innerArgs[startIdx + 3].toFloat())
+                    } else if (count == 4) {
+                        shader.setFloatUniform(name, innerArgs[startIdx + 1].toFloat(), innerArgs[startIdx + 2].toFloat(), innerArgs[startIdx + 3].toFloat(), innerArgs[startIdx + 4].toFloat())
+                    }
+                    ComposeBridge.engine.createNil()
+                })
+                instance
+            } else {
+                ComposeBridge.engine.createNil()
+            }
+        })
+        runtimeShaderTable.setMetatable(runtimeShaderMeta)
+        scriptTable.set("RuntimeShader", runtimeShaderTable)
+
+        val renderEffectTable = ComposeBridge.engine.createTable()
+        renderEffectTable.set("createRuntimeShaderEffect", ComposeBridge.engine.createFunction { args ->
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                val shaderTable = args[0].asTable()
+                val shader = shaderTable.get("_javaRuntimeShader").asUserdata() as android.graphics.RuntimeShader
+                val uniformName = args[1].toStringValue()
+                val effect = android.graphics.RenderEffect.createRuntimeShaderEffect(shader, uniformName).asComposeRenderEffect()
+                ComposeBridge.engine.createUserdata(effect)
+            } else {
+                ComposeBridge.engine.createNil()
+            }
+        })
+        scriptTable.set("RenderEffect", renderEffectTable)
         
                 
         // ------------------- TransformOrigin ---------------

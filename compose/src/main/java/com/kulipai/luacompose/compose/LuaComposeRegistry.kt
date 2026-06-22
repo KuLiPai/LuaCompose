@@ -1,4 +1,5 @@
 package com.kulipai.luacompose.compose
+import com.kulipai.luacompose.compose.animation.core.AnimationCorePlugin
 
 import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
@@ -208,7 +209,7 @@ fun createComposeDrawScope(drawScope: DrawScope): ScriptTable {
         if (pathVal != null && !pathVal.isNil() && block != null) {
             val path = pathVal.asTable().get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
             drawScope.clipPath(path = path) {
-                block.call()
+                block.call(table)
             }
         }
         ComposeBridge.engine.createNil()
@@ -227,7 +228,7 @@ fun createComposeDrawScope(drawScope: DrawScope): ScriptTable {
             drawScope.withTransform({
                 rotate(degrees, Offset(pivotX, pivotY))
             }) {
-                block.call()
+                block.call(table)
             }
         }
         ComposeBridge.engine.createNil()
@@ -294,7 +295,7 @@ object LuaComposeRegistry {
         registerPlugin(com.kulipai.luacompose.compose.ui.graphics.UiGraphicsPlugin())
         registerPlugin(com.kulipai.luacompose.compose.material3.Material3Plugin())
         registerPlugin(AnimationPlugin())
-        registerPlugin(com.kulipai.luacompose.compose.animation.core.AnimationCorePlugin())
+        registerPlugin(AnimationCorePlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.geometry.UiGeometryPlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.unit.UiUnitPlugin())
 

@@ -1,5 +1,6 @@
 package com.kulipai.luacompose.compose.animation.core
 
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.*
 import androidx.compose.runtime.Composable
 import com.kulipai.luacompose.compose.animation.parseAnimationSpec
@@ -23,9 +24,23 @@ class AnimationCorePlugin : ComposeScriptPlugin {
         val engine = ComposeBridge.engine
 
         scriptTable.set("Animatable", engine.createFunction { args ->
-            val initialValue = args[0].toFloat()
+            val initialValueRaw = args.getOrNull(0) ?: engine.createNil()
+            val initialValueAny = if (!initialValueRaw.isNil()) {
+                com.kulipai.luacompose.compose.runtime.ComposeBridge.scriptToJava(initialValueRaw) ?: 0f
+            } else 0f
+            
+            val initialValue = if (initialValueAny is Double) initialValueAny.toFloat()
+                else if (initialValueAny is Int) initialValueAny.toFloat()
+                else initialValueAny
+
+            val typeConverter = if (initialValue is androidx.compose.ui.geometry.Offset) {
+                androidx.compose.ui.geometry.Offset.VectorConverter
+            } else {
+                kotlin.Float.VectorConverter
+            }
+            
             val state = com.kulipai.luacompose.compose.runtime.ComposeAnimatableState(
-                initialValue, kotlin.Float.VectorConverter, com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()!!
+                initialValue, typeConverter as androidx.compose.animation.core.TwoWayConverter<Any, androidx.compose.animation.core.AnimationVector>, com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()!!
             )
             
             val table = engine.createTable()
@@ -40,12 +55,19 @@ class AnimationCorePlugin : ComposeScriptPlugin {
                     }
                     return@createFunction com.kulipai.luacompose.compose.runtime.ComposeBridge.javaToScript(state.get())
                 }
+                if (key == "isRunning") {
+                    return@createFunction engine.createValue(state.animatable.isRunning)
+                }
                 if (key == "snapTo") {
                     return@createFunction engine.createFunction { snapArgs ->
                         val isMethodCall = snapArgs.getOrNull(0) == table
                         val targetArg = if (isMethodCall) snapArgs.getOrNull(1) else snapArgs.getOrNull(0)
-                        val target = targetArg?.toFloat() ?: 0f
-                        state.scope.coroutineScope?.launch {
+                        
+                        var target = com.kulipai.luacompose.compose.runtime.ComposeBridge.scriptToJava(targetArg) ?: 0f
+                        if (target is Double) target = target.toFloat()
+                        if (target is Int) target = target.toFloat()
+
+                        state.scope.coroutineScope?.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
                             state.animatable.snapTo(target)
                             val ms = state.composeState as? androidx.compose.runtime.MutableState<Any?>
                             if (ms != null) ms.value = target
@@ -59,24 +81,29 @@ class AnimationCorePlugin : ComposeScriptPlugin {
                         val isMethodCall = animArgs.getOrNull(0) == table
                         val targetArg = if (isMethodCall) animArgs.getOrNull(1) else animArgs.getOrNull(0)
                         
-                        var target = 0f
-                        var spec: AnimationSpec<Float>? = null
-                        if (targetArg != null && targetArg.isTable()) {
+                        var target: Any = 0f
+                        var spec: AnimationSpec<Any>? = null
+                        if (targetArg != null && targetArg.isTable() && targetArg.asTable().get("targetValue") != null && !targetArg.asTable().get("targetValue").isNil()) {
                             val t = targetArg.asTable()
-                            target = t.get("targetValue").toFloat()
+                            val targetVal = com.kulipai.luacompose.compose.runtime.ComposeBridge.scriptToJava(t.get("targetValue")) ?: 0f
+                            target = if (targetVal is Double) targetVal.toFloat() else if (targetVal is Int) targetVal.toFloat() else targetVal
+                            
                             val s = t.get("animationSpec")
-                            if (!s.isNil()) spec = parseAnimationSpec<Float>(s.asTable()) as AnimationSpec<Float>
+                            if (!s.isNil()) spec = parseAnimationSpec<Any>(s.asTable())
                         } else {
-                            target = targetArg?.toFloat() ?: 0f
+                            val targetVal = com.kulipai.luacompose.compose.runtime.ComposeBridge.scriptToJava(targetArg) ?: 0f
+                            target = if (targetVal is Double) targetVal.toFloat() else if (targetVal is Int) targetVal.toFloat() else targetVal
                         }
-                        state.scope.coroutineScope?.launch {
-                            val block: Animatable<Float, AnimationVector1D>.() -> Unit = {
+                        state.scope.coroutineScope?.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                            val block: androidx.compose.animation.core.Animatable<Any, androidx.compose.animation.core.AnimationVector>.() -> Unit = {
                                 val ms = state.composeState as? androidx.compose.runtime.MutableState<Any?>
                                 if (ms != null) ms.value = this.value
                                 state.invalidateDependents()
                             }
                             if (spec != null) {
                                 state.animatable.animateTo(target, spec, block = block)
+                            } else if (state.currentSpec != null) {
+                                state.animatable.animateTo(target, state.currentSpec!!, block = block)
                             } else {
                                 state.animatable.animateTo(target, block = block)
                             }
@@ -234,6 +261,20 @@ class AnimationCorePlugin : ComposeScriptPlugin {
         scriptTable.set("LinearOutSlowInEasing", engine.createValue("LinearOutSlowInEasing"))
         scriptTable.set("EaseInOutCubic", engine.createValue("EaseInOutCubic"))
         scriptTable.set("EaseOutBounce", engine.createValue("EaseOutBounce"))
+
+        scriptTable.set("CubicBezierEasing", engine.createFunction { args ->
+            val a = args.getOrNull(0)?.let { if (!it.isNil()) it.toFloat() else 0f } ?: 0f
+            val b = args.getOrNull(1)?.let { if (!it.isNil()) it.toFloat() else 0f } ?: 0f
+            val c = args.getOrNull(2)?.let { if (!it.isNil()) it.toFloat() else 1f } ?: 1f
+            val d = args.getOrNull(3)?.let { if (!it.isNil()) it.toFloat() else 1f } ?: 1f
+            val table = engine.createTable()
+            table.set("type", engine.createValue("CubicBezierEasing"))
+            table.set("a", engine.createValue(a.toDouble()))
+            table.set("b", engine.createValue(b.toDouble()))
+            table.set("c", engine.createValue(c.toDouble()))
+            table.set("d", engine.createValue(d.toDouble()))
+            table
+        })
 
         val repeatModeTable = engine.createTable()
         repeatModeTable.set("Restart", ComposeBridge.javaToScript(RepeatMode.Restart))

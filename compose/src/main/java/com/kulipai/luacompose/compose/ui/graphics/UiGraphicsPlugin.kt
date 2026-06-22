@@ -54,6 +54,7 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
                 val fraction = if (key.isNumber()) key.toFloat() else 0f
                 colorStops.add(Pair(fraction, color))
             }
+            colorStops.sortBy { it.first }
 
             val center = if (centerVal != null && !centerVal.isNil()) {
                 val tableCenter = centerVal.asTable()
@@ -101,8 +102,39 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
                 instance
             })
             
-            instance.set("op", ComposeBridge.engine.createFunction { innerArgs ->
+            instance.set("reset", ComposeBridge.engine.createFunction { innerArgs ->
+                path.reset()
+                instance
+            })
+            
+            instance.set("addOval", ComposeBridge.engine.createFunction { innerArgs ->
                 val startIdx = if (innerArgs.size > 0 && innerArgs[0].isTable() && !innerArgs[0].asTable().get("_javaPath").isNil()) 1 else 0
+                val argTable = innerArgs[startIdx].asTable()
+                var rectArg: com.kulipai.luacompose.compose.script.ScriptValue? = argTable.get("_javaRect")
+                if (rectArg == null || rectArg.isNil()) {
+                    rectArg = argTable.get("oval")?.let { if (it.isTable()) it.asTable().get("_javaRect") else it }
+                }
+                if (rectArg != null && !rectArg.isNil()) {
+                    path.addOval(rectArg.asUserdata() as androidx.compose.ui.geometry.Rect)
+                }
+                instance
+            })
+            
+            instance.set("addRect", ComposeBridge.engine.createFunction { innerArgs ->
+                val startIdx = if (innerArgs.size > 0 && innerArgs[0].isTable() && !innerArgs[0].asTable().get("_javaPath").isNil()) 1 else 0
+                val argTable = innerArgs[startIdx].asTable()
+                var rectArg: com.kulipai.luacompose.compose.script.ScriptValue? = argTable.get("_javaRect")
+                if (rectArg == null || rectArg.isNil()) {
+                    rectArg = argTable.get("rect")?.let { if (it.isTable()) it.asTable().get("_javaRect") else it }
+                }
+                if (rectArg != null && !rectArg.isNil()) {
+                    path.addRect(rectArg.asUserdata() as androidx.compose.ui.geometry.Rect)
+                }
+                instance
+            })
+            
+            instance.set("op", ComposeBridge.engine.createFunction { innerArgs ->
+                val startIdx = if (innerArgs.size >= 4) 1 else 0
                 val path1Table = innerArgs[startIdx].asTable()
                 val path1 = path1Table.get("_javaPath").asUserdata() as androidx.compose.ui.graphics.Path
                 val path2Table = innerArgs[startIdx + 1].asTable()
@@ -200,9 +232,20 @@ class UiGraphicsPlugin : ComposeScriptPlugin {
             ComposeBridge.engine.createNil()
         })
         colorTableMeta.set("__call", ComposeBridge.engine.createFunction { args ->
-            val params = args[1]
-            val colorInt = params.toDouble().toLong().toInt()
-            ComposeBridge.javaToScript(Color(colorInt))
+            val p1 = args.getOrNull(1)
+            val p2 = args.getOrNull(2)
+            val p3 = args.getOrNull(3)
+            val p4 = args.getOrNull(4)
+            if (p2 != null && !p2.isNil()) {
+                val red = p1?.toFloat() ?: 0f
+                val green = p2.toFloat()
+                val blue = p3?.let { if (!it.isNil()) it.toFloat() else 0f } ?: 0f
+                val alpha = p4?.let { if (!it.isNil()) it.toFloat() else 1f } ?: 1f
+                ComposeBridge.javaToScript(Color(red, green, blue, alpha))
+            } else {
+                val colorInt = p1?.let { if (!it.isNil()) it.toDouble().toLong().toInt() else 0 } ?: 0
+                ComposeBridge.javaToScript(Color(colorInt))
+            }
         })
         val colorTable = ComposeBridge.engine.createTable()
         colorTable.setMetatable(colorTableMeta)

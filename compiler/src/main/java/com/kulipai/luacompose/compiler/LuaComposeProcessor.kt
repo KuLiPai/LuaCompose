@@ -201,7 +201,7 @@ class LuaComposeProcessor(
                                 |        
                                 |        method.isAccessible = true
                                 |        try {
-                                |            method.invoke(null, *args)
+                                |            com.kulipai.luacompose.compose.runtime.ComposeBridge.invokeSafe(method, null, args)
                                 |        } catch (e: Exception) {
                                 |            android.util.Log.e("LuaCompose", "Error invoking ${"$funcName"}: ${"$"}{e.message}", e)
                                 |        }

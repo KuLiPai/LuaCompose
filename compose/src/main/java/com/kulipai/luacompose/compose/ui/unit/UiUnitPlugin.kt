@@ -14,8 +14,19 @@ class UiUnitPlugin : ComposeScriptPlugin {
     override fun injectGlobals(scriptTable: ScriptTable) {
         val offsetMeta = ComposeBridge.engine.createTable()
         offsetMeta.set("__call", ComposeBridge.engine.createFunction { args ->
-            val x = args.getOrNull(1)?.let { if (!it.isNil()) it.toInt() else 0 } ?: 0
-            val y = args.getOrNull(2)?.let { if (!it.isNil()) it.toInt() else 0 } ?: 0
+            val arg1 = args.getOrNull(1)
+            var x = 0
+            var y = 0
+            if (arg1 != null && arg1.isTable()) {
+                val t = arg1.asTable()
+                val tx = t.get("x")
+                val ty = t.get("y")
+                if (!tx.isNil()) x = tx.toInt()
+                if (!ty.isNil()) y = ty.toInt()
+            } else {
+                x = args.getOrNull(1)?.let { if (!it.isNil()) it.toInt() else 0 } ?: 0
+                y = args.getOrNull(2)?.let { if (!it.isNil()) it.toInt() else 0 } ?: 0
+            }
             val table = ComposeBridge.engine.createTable()
             table.set("x", ComposeBridge.engine.createValue(x.toDouble()))
             table.set("y", ComposeBridge.engine.createValue(y.toDouble()))

@@ -16,6 +16,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import com.kulipai.luacompose.compose.runtime.ComposeBridge
@@ -104,14 +105,24 @@ fun <T> parseAnimationSpec(table: ScriptTable): AnimationSpec<T> {
             val del2 = table.get("delay")
             val delay = if (!del.isNil()) del.toInt() else if (!del2.isNil()) del2.toInt() else 0
             val eas = table.get("easing")
-            val easingStr = if (!eas.isNil()) eas.toStringValue() else "FastOutSlowInEasing"
-            val easing = when (easingStr) {
-                "LinearEasing" -> LinearEasing
-                "FastOutLinearInEasing" -> FastOutLinearInEasing
-                "LinearOutSlowInEasing" -> LinearOutSlowInEasing
-                "EaseInOutCubic" -> EaseInOutCubic
-                "EaseOutBounce" -> EaseOutBounce
-                else -> FastOutSlowInEasing
+            val easing = if (eas.isTable() && eas.asTable().get("type").toStringValue() == "CubicBezierEasing") {
+                val t = eas.asTable()
+                CubicBezierEasing(
+                    t.get("a").toFloat(),
+                    t.get("b").toFloat(),
+                    t.get("c").toFloat(),
+                    t.get("d").toFloat()
+                )
+            } else {
+                val easingStr = if (!eas.isNil()) eas.toStringValue() else "FastOutSlowInEasing"
+                when (easingStr) {
+                    "LinearEasing" -> LinearEasing
+                    "FastOutLinearInEasing" -> FastOutLinearInEasing
+                    "LinearOutSlowInEasing" -> LinearOutSlowInEasing
+                    "EaseInOutCubic" -> EaseInOutCubic
+                    "EaseOutBounce" -> EaseOutBounce
+                    else -> FastOutSlowInEasing
+                }
             }
             tween(durationMillis = duration, delayMillis = delay, easing = easing)
         }

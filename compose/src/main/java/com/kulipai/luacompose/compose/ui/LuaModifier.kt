@@ -30,6 +30,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
@@ -413,16 +415,17 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         val block = if (blockValue.isFunction()) blockValue.asFunction() else null
         
         if (block != null) {
+            val actions = mutableListOf<suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit>()
+            ComposeBridge.pushActivePointerInputScopeActions(actions)
+            try {
+                block.call()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                ComposeBridge.popActivePointerInputScopeActions()
+            }
+
             val lambda: suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit = {
-                val actions = mutableListOf<suspend androidx.compose.ui.input.pointer.PointerInputScope.() -> Unit>()
-                ComposeBridge.pushActivePointerInputScopeActions(actions)
-                try {
-                    block.call()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                } finally {
-                    ComposeBridge.popActivePointerInputScopeActions()
-                }
                 kotlinx.coroutines.coroutineScope {
                     for (action in actions) {
                         launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) { action() }
@@ -634,6 +637,38 @@ class LuaModifier(var modifier: Modifier = Modifier) {
 
     fun scale(scaleX: Float, scaleY: Float): LuaModifier {
         modifier = modifier.scale(scaleX, scaleY); return this
+    }
+
+    fun drawBehind(blockRaw: Any): LuaModifier {
+        val blockValue = if (blockRaw is ScriptValue) blockRaw else ComposeBridge.engine.coerceJavaToScript(blockRaw)
+        if (blockValue.isFunction()) {
+            val block = blockValue.asFunction()
+            modifier = modifier.drawBehind {
+                val scopeTable = ComposeBridge.javaToScript(this)
+                try {
+                    block.call(scopeTable)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        return this
+    }
+
+    fun drawWithContent(blockRaw: Any): LuaModifier {
+        val blockValue = if (blockRaw is ScriptValue) blockRaw else ComposeBridge.engine.coerceJavaToScript(blockRaw)
+        if (blockValue.isFunction()) {
+            val block = blockValue.asFunction()
+            modifier = modifier.drawWithContent {
+                val scopeTable = ComposeBridge.javaToScript(this)
+                try {
+                    block.call(scopeTable)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        }
+        return this
     }
 
     fun graphicsLayer(blockRaw: Any): LuaModifier {

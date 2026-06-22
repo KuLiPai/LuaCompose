@@ -124,12 +124,34 @@ object LuaComposeLib {
                 val key = "effect_${effectFunc.hashCode()}"
                 if (activeScope.effectStates[key] == null) {
                     activeScope.effectStates[key] = true
-                    activeScope.coroutineScope?.launch(kotlinx.coroutines.Dispatchers.Default) {
-                        try {
-                            effectFunc.asFunction().call()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                    activeScope.coroutineScope?.let { coroutineScope ->
+                        val coroutineCreate = env.get("coroutine").asTable().get("create").asFunction()
+                        val coroutineResume = env.get("coroutine").asTable().get("resume").asFunction()
+                        val coroutineStatus = env.get("coroutine").asTable().get("status").asFunction()
+                        
+                        val luaThread = coroutineCreate.call(effectFunc)
+                        
+                        fun resumeLoop(arg: ScriptValue) {
+                            coroutineScope.launch {
+                                try {
+                                    val result = coroutineResume.call(luaThread, arg)
+                                    if (result.isBoolean() && result.toBoolean()) {
+                                        val status = coroutineStatus.call(luaThread)
+                                        if (status.isString() && status.toStringValue() == "suspended") {
+                                            androidx.compose.runtime.withFrameNanos { frameTime ->
+                                                resumeLoop(ComposeBridge.engine.createValue(frameTime.toDouble()))
+                                            }
+                                        }
+                                    } else {
+                                        System.err.println("Coroutine error")
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
                         }
+                        
+                        resumeLoop(ComposeBridge.engine.createNil())
                     }
                 }
             }
@@ -139,22 +161,10 @@ object LuaComposeLib {
         composeTable.set("withFrameNanos", ComposeBridge.engine.createFunction { args ->
             val callback = args[0]
             if (callback.isFunction()) {
-                val activeScope = ComposeBridge.getActiveScope()
-                val clock = activeScope?.coroutineScope?.coroutineContext?.get(androidx.compose.runtime.MonotonicFrameClock)
-                
-                if (clock != null) {
-                    kotlinx.coroutines.runBlocking(clock) {
-                        androidx.compose.runtime.withFrameNanos { frameTime ->
-                            callback.asFunction().call(ComposeBridge.engine.createValue(frameTime.toDouble()))
-                        }
-                    }
-                } else {
-                    kotlinx.coroutines.runBlocking {
-                        kotlinx.coroutines.delay(16)
-                        val frameTime = System.nanoTime()
-                        callback.asFunction().call(ComposeBridge.engine.createValue(frameTime.toDouble()))
-                    }
-                }
+                val yieldFunc = env.get("coroutine").asTable().get("yield").asFunction()
+                val yieldRes = yieldFunc.call(ComposeBridge.engine.createValue("requestFrameNanos"))
+                val frameTime = yieldRes.toDouble()
+                callback.asFunction().call(ComposeBridge.engine.createValue(frameTime))
             }
             ComposeBridge.engine.createNil()
         })
@@ -265,15 +275,34 @@ object LuaComposeLib {
             val coroutineScope = scope?.coroutineScope ?: kotlinx.coroutines.GlobalScope
             val table = ComposeBridge.engine.createTable()
             table.set("launch", ComposeBridge.engine.createFunction { args ->
-                val block = args.getOrNull(0)
+                val isMethodCall = args.getOrNull(0) == table
+                val block = if (isMethodCall) args.getOrNull(1) else args.getOrNull(0)
                 if (block != null && block.isFunction()) {
-                    coroutineScope.launch(kotlinx.coroutines.Dispatchers.Default) {
-                        try {
-                            block.asFunction().call()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                    val coroutineCreate = env.get("coroutine").asTable().get("create").asFunction()
+                    val coroutineResume = env.get("coroutine").asTable().get("resume").asFunction()
+                    val coroutineStatus = env.get("coroutine").asTable().get("status").asFunction()
+                    val luaThread = coroutineCreate.call(block)
+                    
+                    fun resumeLoop(arg: com.kulipai.luacompose.compose.script.ScriptValue) {
+                        coroutineScope.launch {
+                            try {
+                                val result = coroutineResume.call(luaThread, arg)
+                                if (result.isBoolean() && result.toBoolean()) {
+                                    val status = coroutineStatus.call(luaThread)
+                                    if (status.isString() && status.toStringValue() == "suspended") {
+                                        androidx.compose.runtime.withFrameNanos { frameTime ->
+                                            resumeLoop(ComposeBridge.engine.createValue(frameTime.toDouble()))
+                                        }
+                                    }
+                                } else {
+                                    System.err.println("Coroutine error in scope.launch")
+                                }
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         }
                     }
+                    resumeLoop(ComposeBridge.engine.createNil())
                 }
                 ComposeBridge.engine.createNil()
             })
@@ -294,12 +323,34 @@ object LuaComposeLib {
                 val effectKey = "launched_effect_${keys.hashCode()}"
                 if (scope.effectStates[effectKey] == null) {
                     scope.effectStates[effectKey] = true
-                    scope.coroutineScope?.launch(kotlinx.coroutines.Dispatchers.Default) {
-                        try {
-                            effectFunc.asFunction().call()
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                    scope.coroutineScope?.let { coroutineScope ->
+                        val coroutineCreate = env.get("coroutine").asTable().get("create").asFunction()
+                        val coroutineResume = env.get("coroutine").asTable().get("resume").asFunction()
+                        val coroutineStatus = env.get("coroutine").asTable().get("status").asFunction()
+                        
+                        val luaThread = coroutineCreate.call(effectFunc)
+                        
+                        fun resumeLoop(arg: ScriptValue) {
+                            coroutineScope.launch {
+                                try {
+                                    val result = coroutineResume.call(luaThread, arg)
+                                    if (result.isBoolean() && result.toBoolean()) {
+                                        val status = coroutineStatus.call(luaThread)
+                                        if (status.isString() && status.toStringValue() == "suspended") {
+                                            androidx.compose.runtime.withFrameNanos { frameTime ->
+                                                resumeLoop(ComposeBridge.engine.createValue(frameTime.toDouble()))
+                                            }
+                                        }
+                                    } else {
+                                        System.err.println("Coroutine error")
+                                    }
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                            }
                         }
+                        
+                        resumeLoop(ComposeBridge.engine.createNil())
                     }
                 }
             }

@@ -23,8 +23,12 @@ android {
     buildFeatures {
         compose = true
     }
-
-
+    
+    sourceSets {
+        getByName("main") {
+            java.srcDir("build/generated/ksp/debug/kotlin")
+        }
+    }
 }
 
 dependencies {
@@ -47,3 +51,4 @@ dependencies {
     implementation(project(":androlua"))
 
 }
+

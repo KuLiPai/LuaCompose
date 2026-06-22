@@ -54,6 +54,43 @@ object ComposeBridge {
     
     val converters = mutableMapOf<Class<*>, (Any) -> ScriptValue>()
 
+    fun invokeSafe(method: java.lang.reflect.Method, obj: Any?, args: Array<Any?>): Any? {
+        val paramTypes = method.parameterTypes
+        for (i in args.indices) {
+            val arg = args[i]
+            val paramType = paramTypes.getOrNull(i) ?: continue
+            if (arg != null && paramType.name != arg.javaClass.name && !paramType.isPrimitive && paramType != java.lang.Object::class.java) {
+                if (arg is Int) {
+                    try {
+                        val boxMethod = paramType.getDeclaredMethod("box-impl", Int::class.javaPrimitiveType)
+                        args[i] = boxMethod.invoke(null, arg)
+                    } catch (e: Exception) { }
+                } else if (arg is Float) {
+                    try {
+                        val boxMethod = paramType.getDeclaredMethod("box-impl", Float::class.javaPrimitiveType)
+                        args[i] = boxMethod.invoke(null, arg)
+                    } catch (e: Exception) { }
+                } else if (arg is Long) {
+                    try {
+                        val boxMethod = paramType.getDeclaredMethod("box-impl", Long::class.javaPrimitiveType)
+                        args[i] = boxMethod.invoke(null, arg)
+                    } catch (e: Exception) { }
+                } else if (arg is Double) {
+                    try {
+                        val boxMethod = paramType.getDeclaredMethod("box-impl", Double::class.javaPrimitiveType)
+                        args[i] = boxMethod.invoke(null, arg)
+                    } catch (e: Exception) { }
+                } else if (arg is Boolean) {
+                    try {
+                        val boxMethod = paramType.getDeclaredMethod("box-impl", Boolean::class.javaPrimitiveType)
+                        args[i] = boxMethod.invoke(null, arg)
+                    } catch (e: Exception) { }
+                }
+            }
+        }
+        return method.invoke(obj, *args)
+    }
+
     fun getActiveScope(): ComposeScope? {
         val stack = activeScopes.get()!!
         return if (stack.isNotEmpty()) stack.peek() else null
@@ -350,9 +387,12 @@ object ComposeBridge {
                             return@createFunction javaToScript(result)
                         } catch (e: Exception) {
                             android.util.Log.e("LUA_REFLECTION", "Error calling $key on obj class ${obj.javaClass}", e)
+                            e.printStackTrace()
                         }
                         engine.createNil()
                     }
+                } else {
+                    android.util.Log.e("LUA_REFLECTION", "Method $key not found on class ${obj.javaClass}")
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -529,21 +569,17 @@ fun createComposeStateTable(javaState: ComposeState): ScriptTable {
         ComposeBridge.engine.createValue(javaState.get().toString()) 
     })
     meta.set("__index", ComposeBridge.engine.createFunction { args -> 
-        val key = args[1].toStringValue()
+        val key = args.getOrNull(1)?.toStringValue()
         if (key == "value") {
             ComposeBridge.javaToScript(javaState.get())
         } else {
-            table.get(args[1]) // fallback to table's raw get? Or just nil.
-            // Wait, __index is called when the key is not in the table. So nil.
             ComposeBridge.engine.createNil()
         }
     })
     meta.set("__newindex", ComposeBridge.engine.createFunction { args -> 
-        val key = args[1].toStringValue()
+        val key = args.getOrNull(1)?.toStringValue()
         if (key == "value") {
-            javaState.set(ComposeBridge.scriptToJava(args[2]))
-        } else {
-            table.set(args[1], args[2])
+            javaState.set(ComposeBridge.scriptToJava(args.getOrNull(2)))
         }
         ComposeBridge.engine.createNil()
     })

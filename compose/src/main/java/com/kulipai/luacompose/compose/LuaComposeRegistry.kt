@@ -280,6 +280,12 @@ fun createComposeDrawScope(drawScope: DrawScope): ScriptTable {
     val sizeTable = ComposeBridge.engine.createTable()
     sizeTable.setMetatable(sizeMeta)
     table.set("size", sizeTable)
+    val wrapped = com.kulipai.luacompose.compose.runtime.ComposeBridge.wrapObject(drawScope)
+    if (wrapped.isTable()) {
+        val wrappedTable = wrapped.asTable()
+        table.set("_javaObj", wrappedTable.get("_javaObj"))
+        wrappedTable.getMetatable()?.let { table.setMetatable(it) }
+    }
 
     return table
 }

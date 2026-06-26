@@ -290,13 +290,7 @@ object AuxiliaryGenerator {
     }
 
     @OptIn(com.google.devtools.ksp.KspExperimental::class)
-    fun generateBridgeForLocals(
-        resolver: Resolver,
-        packageName: String,
-        codeGenerator: CodeGenerator,
-        logger: KSPLogger,
-        generatedPluginClassNames: MutableSet<String>
-    ) {
+    fun generateBridgeForLocals(resolver: Resolver, packageName: String, category: String?, codeGenerator: CodeGenerator, logger: KSPLogger, generatedPluginClassNames: MutableSet<String>) {
         val packageSafe = packageName.split('.').joinToString("") { it.replaceFirstChar { c -> c.uppercase() } }
         val pluginClassName = "${packageSafe}LocalsPlugin"
         generatedPluginClassNames += pluginClassName
@@ -311,7 +305,7 @@ object AuxiliaryGenerator {
         val pluginTypeSpec = TypeSpec.classBuilder(pluginClassName)
             .addSuperinterface(ClassName("com.kulipai.luacompose.compose.runtime", "ComposeScriptPlugin"))
             .addProperty(PropertySpec.builder("namespace", String::class.asTypeName().copy(nullable = true), KModifier.OVERRIDE)
-                .initializer("null")
+                .initializer(if (category.isNullOrEmpty()) "null" else "%S", category ?: "")
                 .build()
             )
             .addFunction(FunSpec.builder("getComponents")
@@ -342,7 +336,8 @@ object AuxiliaryGenerator {
                         addStatement("    val key = args[1].toStringValue()")
                         addStatement("    if (key == %S) {", "current")
                         addStatement("        val activeScope = com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()")
-                        addStatement("        val localVal = activeScope?.locals?.get(%S)", propName)
+                        addStatement("        if (activeScope == null) throw RuntimeException(%S)", "Local$propName.current 必须在 Composable 作用域内调用，不能在 onClick、onDraw 等回调阶段直接获取！请在组件外层提早获取并用局部变量捕获它。")
+                        addStatement("        val localVal = activeScope.locals.get(%S)", propName)
                         addStatement("        return@createFunction com.kulipai.luacompose.compose.runtime.ComposeBridge.javaToScript(localVal)")
                         addStatement("    }")
                         addStatement("    return@createFunction engine.createNil()")

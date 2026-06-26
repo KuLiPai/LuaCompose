@@ -91,6 +91,10 @@ object LuaComposeLib {
                 if (v.isFunction()) return "<function>"
                 if (v.isTable()) {
                     val t = v.asTable()
+                    val javaObj = t.rawget("_javaObj")
+                    if (!javaObj.isNil()) {
+                        return "<java object: ${javaObj.toStringValue()}>"
+                    }
                     val hash = System.identityHashCode(t)
                     if (!visited.add(hash)) return "<circular reference>"
                     val sb = java.lang.StringBuilder()
@@ -108,7 +112,7 @@ object LuaComposeLib {
                     visited.remove(hash)
                     return sb.toString()
                 }
-                return "<userdata>"
+                return "<userdata: ${v.toStringValue()}>"
             }
             val result = formatValue(arg, "", mutableSetOf())
             android.util.Log.i("LUA_DUMP", result)

@@ -281,6 +281,7 @@ object ComposeBridge {
             is String -> engine.createValue(value)
             is ScriptValue -> value
             else -> {
+                android.util.Log.i("LUA_JAVA_TO_SCRIPT", "Converting object of type ${value::class.java.name}")
                 val clazz = value::class.java
                 for ((cls, converter) in converters) {
                     if (cls.isAssignableFrom(clazz)) {

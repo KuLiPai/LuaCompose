@@ -29,5 +29,6 @@ annotation class LuaBridgeModifiers(
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
 annotation class LuaBridgeLocals(
-    val packageName: String
+    val packageName: String,
+    val category: String = ""
 )

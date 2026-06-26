@@ -63,7 +63,8 @@ class LuaComposeProcessor(
             val annotations = symbol.annotations.filter { it.shortName.asString() == "LuaBridgeLocals" }
             for (annotation in annotations) {
                 val packageName = annotation.arguments.find { it.name?.asString() == "packageName" }?.value as? String ?: continue
-                AuxiliaryGenerator.generateBridgeForLocals(resolver, packageName, codeGenerator, logger, generatedPluginClassNames)
+                val category = annotation.arguments.find { it.name?.asString() == "category" }?.value as? String
+                AuxiliaryGenerator.generateBridgeForLocals(resolver, packageName, category, codeGenerator, logger, generatedPluginClassNames)
             }
         }
         

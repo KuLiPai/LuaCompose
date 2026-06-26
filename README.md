@@ -16,9 +16,7 @@
 
 ## 🛠️ 项目结构
 
-- **`app/src/main/java/com/kulipai/luacompose`**
-  - **`LuaComposeRegistry.kt`**：Compose 组件的注册与映射表。
-  - **`LuaEngine.kt`**：虚拟节点解析与渲染引擎核心。
-  - **`MainActivity.kt`**：加载 Lua 脚本并承载渲染的主活动。
-- **`app/src/main/java/com/nekolaska/ktx`**：对 Lua 对象的 Kotlin 语法糖与拓展方法。
-- **`app/src/main/java/org/luaj/lib/jse` & `dx`**：底层的 Java-Lua 反射桥接适配和动态生成组件。
+- **`annotations/`**：存放专门用于 KSP 扫描的自定义注解（例如 `@LuaBridgePackage`、`@LuaBridgeLocals`）。
+- **`compiler/`**：基于 KSP 构建的符号处理器，负责在编译期自动扫描分析 Compose 源码并生成 Lua 到 Compose 的静态桥接插件代码，替代运行时反射提升性能。
+- **`compose/`**：Lua 桥接核心层模块，包含 `ComposeBridge`、`LuaComposeRegistry` 以及底层的 Java-Lua 对象包裹器（Wrapper）与全局工具函数（例如 `dump`）。
+- **`app/`**：宿主应用层，包含启动和执行 Lua 脚本的入口（`MainActivity.kt`）。

@@ -10,7 +10,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import com.kulipai.luacompose.TestPointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.kulipai.luacompose.compose.ui.LuaModifier

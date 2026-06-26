@@ -73,6 +73,47 @@ object LuaComposeLib {
         globalEnv = env
         val composeTable = ComposeBridge.createLazyNamespace("androidx.compose")
         env.set("compose", composeTable)
+        
+        env.set("dump", ComposeBridge.engine.createFunction { args ->
+            val arg = args.getOrNull(0)
+            if (arg == null || arg.isNil()) {
+                android.util.Log.i("LUA_DUMP", "nil")
+                return@createFunction ComposeBridge.engine.createNil()
+            }
+            fun formatValue(v: ScriptValue, indent: String, visited: MutableSet<Int>): String {
+                if (v.isNil()) return "nil"
+                if (v.isBoolean()) return v.toBoolean().toString()
+                if (v.isNumber()) {
+                    val num = v.toDouble()
+                    return if (num == num.toLong().toDouble()) num.toLong().toString() else num.toString()
+                }
+                if (v.isString()) return "\"${v.toStringValue()}\""
+                if (v.isFunction()) return "<function>"
+                if (v.isTable()) {
+                    val t = v.asTable()
+                    val hash = System.identityHashCode(t)
+                    if (!visited.add(hash)) return "<circular reference>"
+                    val sb = java.lang.StringBuilder()
+                    sb.append("{\n")
+                    val keys = t.keys()
+                    for (k in keys) {
+                        sb.append(indent).append("  [")
+                        sb.append(formatValue(k, "", visited))
+                        sb.append("] = ")
+                        val vv = t.get(k)
+                        sb.append(formatValue(vv, indent + "  ", visited))
+                        sb.append(",\n")
+                    }
+                    sb.append(indent).append("}")
+                    visited.remove(hash)
+                    return sb.toString()
+                }
+                return "<userdata>"
+            }
+            val result = formatValue(arg, "", mutableSetOf())
+            android.util.Log.i("LUA_DUMP", result)
+            ComposeBridge.engine.createNil()
+        })
 
         composeTable.set("delay", ComposeBridge.engine.createFunction { args ->
             val ms = args[0].toLong()

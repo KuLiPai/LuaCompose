@@ -636,6 +636,8 @@ class ComposeScope(var contentFunc: ScriptFunction) {
     internal val states = mutableMapOf<Any, ScriptTable>()
     internal var statesCount = 0
 
+    val locals = mutableMapOf<String, Any?>()
+
     internal val remembers = mutableMapOf<Any, Any?>()
     internal var remembersCount = 0
 

@@ -288,4 +288,91 @@ object AuxiliaryGenerator {
             
         fileSpec.writeTo(codeGenerator, Dependencies(true))
     }
+
+    @OptIn(com.google.devtools.ksp.KspExperimental::class)
+    fun generateBridgeForLocals(
+        resolver: Resolver,
+        packageName: String,
+        codeGenerator: CodeGenerator,
+        logger: KSPLogger,
+        generatedPluginClassNames: MutableSet<String>
+    ) {
+        val packageSafe = packageName.split('.').joinToString("") { it.replaceFirstChar { c -> c.uppercase() } }
+        val pluginClassName = "${packageSafe}LocalsPlugin"
+        generatedPluginClassNames += pluginClassName
+        
+        val decls = resolver.getDeclarationsFromPackage(packageName)
+        val localProps = decls.filterIsInstance<KSPropertyDeclaration>()
+            .filter { it.isPublic() && it.simpleName.asString().startsWith("Local") }
+            .toList()
+            
+        if (localProps.isEmpty()) return
+        
+        val pluginTypeSpec = TypeSpec.classBuilder(pluginClassName)
+            .addSuperinterface(ClassName("com.kulipai.luacompose.compose.runtime", "ComposeScriptPlugin"))
+            .addProperty(PropertySpec.builder("namespace", String::class.asTypeName().copy(nullable = true), KModifier.OVERRIDE)
+                .initializer("null")
+                .build()
+            )
+            .addFunction(FunSpec.builder("getComponents")
+                .addModifiers(KModifier.OVERRIDE)
+                .returns(ClassName("kotlin.collections", "Map").parameterizedBy(
+                    String::class.asTypeName(),
+                    LambdaTypeName.get(
+                        parameters = arrayOf(
+                            ParameterSpec.unnamed(ClassName("kotlin.collections", "Map").parameterizedBy(String::class.asTypeName(), Any::class.asTypeName().copy(nullable = true))),
+                            ParameterSpec.unnamed(ClassName("com.kulipai.luacompose.compose.runtime", "ComposeScope").copy(nullable = true))
+                        ),
+                        returnType = Unit::class.asTypeName()
+                    ).copy(annotations = listOf(AnnotationSpec.builder(ClassName("androidx.compose.runtime", "Composable")).build()))
+                ))
+                .addStatement("return emptyMap()")
+                .build()
+            )
+            .addFunction(FunSpec.builder("injectGlobals")
+                .addModifiers(KModifier.OVERRIDE)
+                .addParameter("scriptTable", ClassName("com.kulipai.luacompose.compose.script", "ScriptTable"))
+                .apply {
+                    addStatement("val engine = com.kulipai.luacompose.compose.runtime.ComposeBridge.engine")
+                    for (prop in localProps) {
+                        val propName = prop.simpleName.asString()
+                        addStatement("val %LTable = engine.createTable()", propName)
+                        addStatement("val %LMeta = engine.createTable()", propName)
+                        addStatement("%LMeta.set(%S, engine.createFunction { args ->", propName, "__index")
+                        addStatement("    val key = args[1].toStringValue()")
+                        addStatement("    if (key == %S) {", "current")
+                        addStatement("        val activeScope = com.kulipai.luacompose.compose.runtime.ComposeBridge.getActiveScope()")
+                        addStatement("        val localVal = activeScope?.locals?.get(%S)", propName)
+                        addStatement("        return@createFunction com.kulipai.luacompose.compose.runtime.ComposeBridge.javaToScript(localVal)")
+                        addStatement("    }")
+                        addStatement("    return@createFunction engine.createNil()")
+                        addStatement("})")
+                        addStatement("%LTable.setMetatable(%LMeta)", propName, propName)
+                        addStatement("scriptTable.set(%S, %LTable)", propName, propName)
+                    }
+                }
+                .build()
+            )
+            .addFunction(FunSpec.builder("injectLocals")
+                .addModifiers(KModifier.OVERRIDE)
+                .addAnnotation(AnnotationSpec.builder(ClassName("androidx.compose.runtime", "Composable")).build())
+                .addParameter("scope", ClassName("com.kulipai.luacompose.compose.runtime", "ComposeScope"))
+                .apply {
+                    for (prop in localProps) {
+                        val propName = prop.simpleName.asString()
+                        addStatement("scope.locals[%S] = %L.current", propName, propName)
+                    }
+                }
+                .build()
+            )
+            .build()
+            
+        val fileSpec = FileSpec.builder("com.kulipai.luacompose.generated", pluginClassName)
+            .addAnnotation(AnnotationSpec.builder(Suppress::class).addMember("%S, %S", "OPT_IN_USAGE", "OPT_IN_USAGE_ERROR").build())
+            .addType(pluginTypeSpec)
+            .addImport(packageName, localProps.map { it.simpleName.asString() }.distinct())
+            .build()
+            
+        fileSpec.writeTo(codeGenerator, Dependencies(true))
+    }
 }

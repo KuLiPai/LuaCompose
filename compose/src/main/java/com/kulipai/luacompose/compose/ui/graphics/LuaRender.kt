@@ -36,6 +36,10 @@ fun ComposeScopeComponent(scope: ComposeScope, parentComposeScope: Any? = null, 
     scope.colorScheme = currentColorScheme
     scope.typography = currentTypography
     scope.shapes = currentShapes
+    
+    for (plugin in LuaComposeRegistry.plugins) {
+        plugin.injectLocals(scope)
+    }
 
     val version by scope.recomposeVersion
     val nodes = remember(

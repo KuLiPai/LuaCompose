@@ -24,3 +24,10 @@ annotation class LuaBridgeClass(
 annotation class LuaBridgeModifiers(
     val packageName: String
 )
+
+@Repeatable
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.SOURCE)
+annotation class LuaBridgeLocals(
+    val packageName: String
+)

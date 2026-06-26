@@ -9,4 +9,5 @@ import com.kulipai.luacompose.annotations.LuaBridgePackage
 @com.kulipai.luacompose.annotations.LuaBridgeClass(targetClass = androidx.compose.ui.graphics.Color::class, category = "ui.graphics")
 @com.kulipai.luacompose.annotations.LuaBridgeClass(targetClass = androidx.compose.ui.unit.Dp::class, category = "ui.unit")
 @com.kulipai.luacompose.annotations.LuaBridgeModifiers(packageName = "androidx.compose.foundation.layout")
+@com.kulipai.luacompose.annotations.LuaBridgeLocals(packageName = "androidx.compose.ui.platform")
 class LuaComposeConfig

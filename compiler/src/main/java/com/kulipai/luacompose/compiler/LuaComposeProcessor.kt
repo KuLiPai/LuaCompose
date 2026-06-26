@@ -56,6 +56,16 @@ class LuaComposeProcessor(
                 AuxiliaryGenerator.generateBridgeForModifiers(resolver, packageName, codeGenerator, logger, generatedPluginClassNames)
             }
         }
+
+        val bridgeLocalsSymbols = resolver.getSymbolsWithAnnotation("com.kulipai.luacompose.annotations.LuaBridgeLocals")
+        for (symbol in bridgeLocalsSymbols) {
+            if (symbol !is KSClassDeclaration) continue
+            val annotations = symbol.annotations.filter { it.shortName.asString() == "LuaBridgeLocals" }
+            for (annotation in annotations) {
+                val packageName = annotation.arguments.find { it.name?.asString() == "packageName" }?.value as? String ?: continue
+                AuxiliaryGenerator.generateBridgeForLocals(resolver, packageName, codeGenerator, logger, generatedPluginClassNames)
+            }
+        }
         
         if (!registryGenerated && generatedPluginClassNames.isNotEmpty()) {
             generatePluginRegistry()

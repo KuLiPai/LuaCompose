@@ -48,6 +48,9 @@ class LuajTable(val luajTable: org.luaj.LuaTable) : ScriptTable, ScriptValue by 
     override fun set(key: String, value: ScriptValue) { luajTable.set(key, value.toLuaj()) }
     override fun set(index: Int, value: ScriptValue) { luajTable.set(index, value.toLuaj()) }
     override fun set(key: ScriptValue, value: ScriptValue) { luajTable.set(key.toLuaj(), value.toLuaj()) }
+
+    override fun rawset(key: String, value: ScriptValue) { luajTable.rawset(key, value.toLuaj()) }
+    override fun rawset(key: ScriptValue, value: ScriptValue) { luajTable.rawset(key.toLuaj(), value.toLuaj()) }
     
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

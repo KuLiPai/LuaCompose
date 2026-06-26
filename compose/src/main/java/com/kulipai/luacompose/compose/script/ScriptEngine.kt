@@ -32,6 +32,9 @@ interface ScriptTable : ScriptValue {
     fun set(key: String, value: ScriptValue)
     fun set(index: Int, value: ScriptValue)
     fun set(key: ScriptValue, value: ScriptValue)
+
+    fun rawset(key: String, value: ScriptValue)
+    fun rawset(key: ScriptValue, value: ScriptValue)
     
     fun length(): Int
     fun keys(): List<ScriptValue>

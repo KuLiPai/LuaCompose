@@ -35,6 +35,28 @@ class LuaComposeProcessor(
             }
         }
 
+        val bridgeClassSymbols = resolver.getSymbolsWithAnnotation("com.kulipai.luacompose.annotations.LuaBridgeClass")
+        for (symbol in bridgeClassSymbols) {
+            if (symbol !is KSClassDeclaration) continue
+            val annotations = symbol.annotations.filter { it.shortName.asString() == "LuaBridgeClass" }
+            for (annotation in annotations) {
+                val ksType = annotation.arguments.find { it.name?.asString() == "targetClass" }?.value as? KSType ?: continue
+                val targetDecl = ksType.declaration as? KSClassDeclaration ?: continue
+                val category = annotation.arguments.find { it.name?.asString() == "category" }?.value as? String ?: "ui"
+                AuxiliaryGenerator.generateBridgeForClass(resolver, targetDecl, category, codeGenerator, logger, generatedPluginClassNames)
+            }
+        }
+
+        val bridgeModifiersSymbols = resolver.getSymbolsWithAnnotation("com.kulipai.luacompose.annotations.LuaBridgeModifiers")
+        for (symbol in bridgeModifiersSymbols) {
+            if (symbol !is KSClassDeclaration) continue
+            val annotations = symbol.annotations.filter { it.shortName.asString() == "LuaBridgeModifiers" }
+            for (annotation in annotations) {
+                val packageName = annotation.arguments.find { it.name?.asString() == "packageName" }?.value as? String ?: continue
+                AuxiliaryGenerator.generateBridgeForModifiers(resolver, packageName, codeGenerator, logger, generatedPluginClassNames)
+            }
+        }
+        
         if (!registryGenerated && generatedPluginClassNames.isNotEmpty()) {
             generatePluginRegistry()
             registryGenerated = true

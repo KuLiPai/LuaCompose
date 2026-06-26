@@ -10,6 +10,7 @@ annotation class LuaBridgePackage(
     val category: String = "ui"
 )
 
+@Repeatable
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
 annotation class LuaBridgeClass(
@@ -17,6 +18,7 @@ annotation class LuaBridgeClass(
     val category: String = "ui"
 )
 
+@Repeatable
 @Target(AnnotationTarget.CLASS)
 @Retention(AnnotationRetention.SOURCE)
 annotation class LuaBridgeModifiers(

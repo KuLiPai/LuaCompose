@@ -31,6 +31,7 @@ data class ComposeNode(
 
 object ComposeBridge {
     lateinit var engine: ScriptEngine
+    val executeLock = java.util.concurrent.locks.ReentrantLock()
 
     private val activeScopes = ThreadLocal.withInitial { Stack<ComposeScope>() }
     private val activeNodeLists = ThreadLocal.withInitial { Stack<MutableList<ComposeNode>>() }
@@ -670,62 +671,70 @@ class ComposeScope(var contentFunc: ScriptFunction) {
     }
 
     fun execute(vararg args: ScriptValue): List<ComposeNode> {
-        ComposeBridge.pushActiveScope(this)
-        val rootNodes = mutableListOf<ComposeNode>()
-        ComposeBridge.pushActiveNodeList(rootNodes)
-        
-        statesCount = 0
-        remembersCount = 0
-        childScopesCount = 0
-        accessedStates.clear()
-        accessedRemembers.clear()
-        accessedChildScopes.clear()
-        
+        ComposeBridge.executeLock.lock()
         try {
-            contentFunc.call(*args)
-        } catch (e: Exception) {
-            val stackTraceStr = e.stackTrace.take(50).joinToString("\n") { "\tat $it" } + if (e.stackTrace.size > 50) "\n\t... ${e.stackTrace.size - 50} more" else ""
-            var fullStr = "${e.javaClass.name}: ${e.message}\n$stackTraceStr"
-            var cause = e.cause
-            while (cause != null) {
-                val causeStack = cause.stackTrace.take(50).joinToString("\n") { "\tat $it" } + if (cause.stackTrace.size > 50) "\n\t... ${cause.stackTrace.size - 50} more" else ""
-                fullStr += "\nCaused by: ${cause.javaClass.name}: ${cause.message}\n$causeStack"
-                cause = cause.cause
-            }
-            android.util.Log.e("LUA_ERROR", fullStr)
-            val errorMsg = "Script Error: ${e.message}\n\n$fullStr"
-            rootNodes.add(
-                ComposeNode(
-                    "LuaError", // Keeping name for compatibility with renderer
-                    mapOf("text" to errorMsg, "color" to "#ff0000"),
-                    null
+            ComposeBridge.pushActiveScope(this)
+            val rootNodes = mutableListOf<ComposeNode>()
+            ComposeBridge.pushActiveNodeList(rootNodes)
+            
+            statesCount = 0
+            remembersCount = 0
+            childScopesCount = 0
+            accessedStates.clear()
+            accessedRemembers.clear()
+            accessedChildScopes.clear()
+            
+            try {
+                contentFunc.call(*args)
+            } catch (e: Exception) {
+                val stackTraceStr = e.stackTrace.take(50).joinToString("\n") { "\tat $it" } + if (e.stackTrace.size > 50) "\n\t... ${e.stackTrace.size - 50} more" else ""
+                var fullStr = "${e.javaClass.name}: ${e.message}\n$stackTraceStr"
+                var cause = e.cause
+                while (cause != null) {
+                    val causeStack = cause.stackTrace.take(50).joinToString("\n") { "\tat $it" } + if (cause.stackTrace.size > 50) "\n\t... ${cause.stackTrace.size - 50} more" else ""
+                    fullStr += "\nCaused by: ${cause.javaClass.name}: ${cause.message}\n$causeStack"
+                    cause = cause.cause
+                }
+                android.util.Log.e("LUA_ERROR", fullStr)
+                val errorMsg = "Script Error: ${e.message}\n\n$fullStr"
+                rootNodes.add(
+                    ComposeNode(
+                        "LuaError", // Keeping name for compatibility with renderer
+                        mapOf("text" to errorMsg, "color" to "#ff0000"),
+                        null
+                    )
                 )
-            )
-        } finally {
-            ComposeBridge.popActiveNodeList()
-            ComposeBridge.popActiveScope()
-        }
-        
-        states.keys.retainAll(accessedStates)
-        remembers.keys.retainAll(accessedRemembers)
-        rememberKeys.keys.retainAll(accessedRemembers)
-        childScopes.keys.retainAll(accessedChildScopes)
+            } finally {
+                ComposeBridge.popActiveNodeList()
+                ComposeBridge.popActiveScope()
+            }
+            
+            states.keys.retainAll(accessedStates)
+            remembers.keys.retainAll(accessedRemembers)
+            rememberKeys.keys.retainAll(accessedRemembers)
+            childScopes.keys.retainAll(accessedChildScopes)
 
-        return rootNodes
+            return rootNodes
+        } finally {
+            ComposeBridge.executeLock.unlock()
+        }
     }
+
 }
 
 open class ComposeState(initialValue: Any?, val scope: ComposeScope) {
     open val composeState: State<Any?> = mutableStateOf(initialValue)
-    protected val dependentScopes = mutableSetOf<ComposeScope>()
+    protected val dependentScopes = java.util.Collections.synchronizedSet(java.util.Collections.newSetFromMap(java.util.WeakHashMap<ComposeScope, Boolean>()))
 
     fun registerDependency(scope: ComposeScope) {
         dependentScopes.add(scope)
     }
 
     fun invalidateDependents() {
-        for (scope in dependentScopes) {
-            scope.invalidate()
+        synchronized(dependentScopes) {
+            for (scope in dependentScopes) {
+                scope.invalidate()
+            }
         }
     }
 
@@ -742,8 +751,10 @@ open class ComposeState(initialValue: Any?, val scope: ComposeScope) {
             val ms = composeState as androidx.compose.runtime.MutableState<Any?>
             if (ms.value != newValue) {
                 ms.value = newValue
-                for (scope in dependentScopes) {
-                    scope.invalidate()
+                synchronized(dependentScopes) {
+                    for (scope in dependentScopes) {
+                        scope.invalidate()
+                    }
                 }
             }
         }
@@ -776,8 +787,10 @@ class ComposeAnimatableState<T, V : AnimationVector>(
                     val ms = composeState as androidx.compose.runtime.MutableState<Any?>
                     ms.value = this.value
                 }
-                for (dep in dependentScopes) {
-                    dep.invalidate()
+                synchronized(dependentScopes) {
+                    for (dep in dependentScopes) {
+                        dep.invalidate()
+                    }
                 }
             }
             if (currentSpec != null) {

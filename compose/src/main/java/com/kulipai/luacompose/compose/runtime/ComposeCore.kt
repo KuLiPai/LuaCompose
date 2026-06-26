@@ -38,6 +38,12 @@ object ComposeBridge {
     private val activeSharedTransitionScopes = ThreadLocal.withInitial { Stack<androidx.compose.animation.SharedTransitionScope>() }
     private val activeAnimatedVisibilityScopes = ThreadLocal.withInitial { Stack<androidx.compose.animation.AnimatedVisibilityScope>() }
     
+    val classPrototypes = mutableMapOf<String, ScriptTable>()
+    
+    fun registerExtension(className: String, ext: ScriptTable) {
+        classPrototypes[className] = ext
+    }
+
     val contextReceiversStack = ThreadLocal.withInitial { ArrayDeque<Any>() }
     
     fun pushContextReceiver(receiver: Any) {
@@ -398,6 +404,31 @@ object ComposeBridge {
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+            
+            // Prototype lookup
+            var currentClass: Class<*>? = obj.javaClass
+            val visited = mutableSetOf<Class<*>>()
+            val queue = ArrayDeque<Class<*>>()
+            if (currentClass != null) queue.add(currentClass)
+            while (queue.isNotEmpty()) {
+                val clazz = queue.removeFirst()
+                if (!visited.add(clazz)) continue
+                
+                val proto = classPrototypes[clazz.name]
+                if (proto != null) {
+                    val luaVal = proto.get(key)
+                    if (luaVal != null && !luaVal.isNil()) {
+                        return@createFunction luaVal
+                    }
+                }
+                
+                // For Kotlin interfaces or Companion objects, we might want to check the companion or the interfaces
+                if (clazz.superclass != null) queue.addLast(clazz.superclass)
+                for (iface in clazz.interfaces) {
+                    queue.addLast(iface)
+                }
+            }
+            
             engine.createNil()
         })
         
@@ -429,6 +460,7 @@ object ComposeBridge {
             } catch (e: Exception) {
                 android.util.Log.e("LUA_REFLECTION", "Error setting $key on obj class ${obj.javaClass}", e)
             }
+            args[0].asTable().rawset(key, value)
             engine.createNil()
         })
         

@@ -471,6 +471,9 @@ object LuaComposeLib {
             }
         }
 
+        // Export Modifier globally for backward compatibility
+        env.set("Modifier", composeTable.get("Modifier"))
+        
         return composeTable
     }
 }

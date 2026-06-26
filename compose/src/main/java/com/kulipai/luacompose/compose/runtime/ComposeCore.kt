@@ -419,6 +419,22 @@ object ComposeBridge {
                 if (proto != null) {
                     val luaVal = proto.get(key)
                     if (luaVal != null && !luaVal.isNil()) {
+                        if (luaVal.isFunction()) {
+                            return@createFunction engine.createFunction { funcArgs ->
+                                val isSelf = funcArgs.getOrNull(0)?.isTable() == true && 
+                                             !funcArgs.getOrNull(0)!!.asTable().get("_javaObj").isNil() && 
+                                             funcArgs.getOrNull(0)!!.asTable().get("_javaObj").asUserdata() === obj
+                                
+                                if (isSelf) {
+                                    return@createFunction luaVal.asFunction().call(*funcArgs)
+                                } else {
+                                    // Inject `self` as the first argument because they used `.` instead of `:`
+                                    val wrappedSelf = javaToScript(obj)
+                                    val newArgs = arrayOf(wrappedSelf) + funcArgs
+                                    return@createFunction luaVal.asFunction().call(*newArgs)
+                                }
+                            }
+                        }
                         return@createFunction luaVal
                     }
                 }

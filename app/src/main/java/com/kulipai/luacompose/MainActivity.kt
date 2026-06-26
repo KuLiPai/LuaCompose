@@ -129,12 +129,6 @@ fun loadLuaScope(context: Context): ComposeScope {
         LuaComposeLib.inject(env)
 
 
-        // 3. 注册 Modifier 全局对象
-        globals.set("Modifier", object : ZeroArgFunction() {
-            override fun call(): LuaValue {
-                return CoerceJavaToLua.coerce(LuaModifier())
-            }
-        })
 
         // 4. 定位外置存储路径 /sdcard/Android/data/<packagename>/files/
         val externalDir = context.getExternalFilesDir(null)

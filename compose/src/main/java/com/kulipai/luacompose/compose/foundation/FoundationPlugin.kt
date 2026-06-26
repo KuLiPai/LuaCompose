@@ -29,9 +29,14 @@ class FoundationPlugin : ComposeScriptPlugin {
         })
         scriptTable.set("CircleShape", ComposeBridge.javaToScript(CircleShape))
 
-        scriptTable.set("Modifier", ComposeBridge.engine.createFunction { _ ->
+        val modifierTable = ComposeBridge.engine.createTable()
+        ComposeBridge.registerExtension("com.kulipai.luacompose.compose.ui.LuaModifier", modifierTable)
+        val modifierMeta = ComposeBridge.engine.createTable()
+        modifierMeta.set("__call", ComposeBridge.engine.createFunction { _ ->
             ComposeBridge.javaToScript(com.kulipai.luacompose.compose.ui.LuaModifier())
         })
+        modifierTable.setMetatable(modifierMeta)
+        scriptTable.set("Modifier", modifierTable)
 
         // -------------- Arrangement ------------------
         val arrangementTable = ComposeBridge.engine.createTable()

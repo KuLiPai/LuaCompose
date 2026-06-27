@@ -75,11 +75,6 @@ object LuaComposeLib {
         env.set("compose", composeTable)
         
         env.set("dump", ComposeBridge.engine.createFunction { args ->
-            val arg = args.getOrNull(0)
-            if (arg == null || arg.isNil()) {
-                android.util.Log.i("LUA_DUMP", "nil")
-                return@createFunction ComposeBridge.engine.createNil()
-            }
             fun formatValue(v: ScriptValue, indent: String, visited: MutableSet<Int>): String {
                 if (v.isNil()) return "nil"
                 if (v.isBoolean()) return v.toBoolean().toString()
@@ -114,9 +109,16 @@ object LuaComposeLib {
                 }
                 return "<userdata: ${v.toStringValue()}>"
             }
-            val result = formatValue(arg, "", mutableSetOf())
+            
+            val sb = StringBuilder()
+            for (i in args.indices) {
+                if (i > 0) sb.append("\t")
+                sb.append(formatValue(args[i], "", mutableSetOf()))
+            }
+            val result = sb.toString()
             android.util.Log.i("LUA_DUMP", result)
-            ComposeBridge.engine.createNil()
+            println(result)
+            ComposeBridge.engine.createValue(result)
         })
 
         composeTable.set("delay", ComposeBridge.engine.createFunction { args ->

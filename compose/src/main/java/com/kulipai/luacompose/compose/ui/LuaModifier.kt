@@ -465,17 +465,12 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         val unwrapped = ComposeBridge.unwrapAny(shapeProp)
         if (unwrapped is Map<*, *>) {
             val shape = unwrapped["shape"] ?: unwrapped[1.0] ?: unwrapped[1]
-            if (shape != null) return clip(shape)
+            if (shape != null) return clip(shape as Any)
         }
         val clipShape = resolveShape(unwrapped)
         if (clipShape != null) {
             modifier = modifier.clip(clipShape)
         }
-        return this
-    }
-
-    fun clip(shape: Shape): LuaModifier {
-        modifier = modifier.clip(shape)
         return this
     }
 

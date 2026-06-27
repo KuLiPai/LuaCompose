@@ -84,7 +84,7 @@ function AnimationExample11()
     }
 
     Column {
-        modifier = Modifier().fillMaxWidth().padding(16),
+        modifier = Modifier.fillMaxWidth().padding(16),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
             Text {
@@ -98,11 +98,11 @@ function AnimationExample11()
             }
 
             Row {
-                modifier = Modifier().fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16, Alignment.CenterHorizontally),
                 content = function()
                     Box {
-                        modifier = Modifier()
+                        modifier = Modifier
                                 .size(ICON_BOX_DP)
                                 .background({ color = bgColor.value, shape = CircleShape })
                                 .clickable(function()
@@ -139,7 +139,7 @@ function PlayPauseMorph(args)
     local iconBoxDp = args["iconBoxDp"]
 
     Canvas {
-        modifier = Modifier().size((iconBoxDp / 2)),
+        modifier = Modifier.size((iconBoxDp / 2)),
         onDraw = function(scope)
             local w = scope.size.width
             local h = scope.size.height

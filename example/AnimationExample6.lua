@@ -69,11 +69,11 @@ function AnimationExample6()
     local selected = state(1)
 
     Column {
-        modifier = Modifier().fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
             Row {
-                modifier = Modifier().fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8),
                 content = function()
                     for index, t in tabs do
@@ -86,7 +86,7 @@ function AnimationExample6()
                                 onClick = function()
                                     selected.value = index
                                 end,
-                                modifier = Modifier().height(44),
+                                modifier = Modifier.height(44),
                                 content = function()
 
                                     Text {
@@ -104,7 +104,7 @@ function AnimationExample6()
                                 onClick = function()
                                     selected.value = index
                                 end,
-                                modifier = Modifier().height(44),
+                                modifier = Modifier.height(44),
                                 content = function()
 
                                     Text {
@@ -129,14 +129,14 @@ function AnimationExample6()
                 content = function(current)
                     emoji, name, color = table.unpack(tabs[current])
                     Surface {
-                        modifier = Modifier()
+                        modifier = Modifier
                                 .fillMaxWidth()
                                 .height(260),
                         shape = RoundedCornerShape(20),
                         color = color,
                         content = function()
                             Box {
-                                modifier = Modifier()
+                                modifier = Modifier
                                         .fillMaxSize()
                                         .padding(24),
                                 contentAlignment = Alignment.Center,

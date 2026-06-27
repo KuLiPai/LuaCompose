@@ -92,13 +92,13 @@ function AnimationExample4()
     }
 
     Column {
-        modifier = Modifier().fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
 
 
             Box {
-                modifier = Modifier()
+                modifier = Modifier
                         .fillMaxWidth()
                         .height(240),
                 contentAlignment = Alignment.Center,
@@ -106,7 +106,7 @@ function AnimationExample4()
 
 
                     Box {
-                        modifier = Modifier()
+                        modifier = Modifier
                                 .size(size.value)
                                 .rotate(rotation.value)
                                 .clip(RoundedCornerShape(cornerDp.value))
@@ -132,7 +132,7 @@ function AnimationExample4()
 
             Text {
                 text = "Tap to morph",
-                modifier = Modifier().fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.labelLarge,
             }
 

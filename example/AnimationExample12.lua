@@ -56,7 +56,7 @@ local function CardList(args)
             for _, model in ipairs(cards) do
                 withScope(scope, function()
                     Row({
-                        modifier = Modifier()
+                        modifier = Modifier
                                 .fillMaxWidth()
                                 .height(80)
                                 .sharedElement({
@@ -78,7 +78,7 @@ local function CardList(args)
                         horizontalArrangement = Arrangement.spacedBy(12),
                         content = function()
                             Box({
-                                modifier = Modifier()
+                                modifier = Modifier
                                         .size(40)
                                         .background(
                                         Color.White.copy({ alpha = 0.3 }),
@@ -109,7 +109,7 @@ local function CardDetail(args)
 
     withScope(scope, function()
         Column({
-            modifier = Modifier()
+            modifier = Modifier
                     .fillMaxWidth()
                     .height(detailHeightDp)
 
@@ -135,14 +135,14 @@ local function CardDetail(args)
                     color = Color.White,
                     style = MaterialTheme.typography.headlineLarge,
                 })
-                Spacer({ modifier = Modifier().height(4) })
+                Spacer({ modifier = Modifier.height(4) })
                 Text({
                     text = model.body,
                     color = Color.White,
                     style = MaterialTheme.typography.bodyLarge,
                 })
                 Box({
-                    modifier = Modifier().fillMaxSize(),
+                    modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.BottomEnd,
                     content = function()
                         Text({
@@ -186,7 +186,7 @@ function AnimationExample12()
     local selectedId = state(nil)
 
     Column({
-        modifier = Modifier().fillMaxWidth().padding(16),
+        modifier = Modifier.fillMaxWidth().padding(16),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
             Text({
@@ -198,7 +198,7 @@ function AnimationExample12()
                 style = MaterialTheme.typography.bodySmall,
             })
             SharedTransitionLayout({
-                modifier = Modifier().fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 content = function(sharedTransitionScope)
                     AnimatedContent({
                         targetState = selectedId.value,

@@ -247,7 +247,7 @@ local function ThemeToggleButton(args)
     local sunColor = args.sunColor
     local moonColor = args.moonColor
     local onToggle = args.onToggle
-    local modifier = args.modifier or Modifier()
+    local modifier = args.modifier or Modifier
 
     local progress = animateFloatAsState(isDarkTheme and 1.0 or 0.0, spring(0.75, 300, nil))
 
@@ -600,11 +600,11 @@ function AnimationExample22()
 ]]
 
     Column {
-        modifier = Modifier().fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12),
         content = function()
             BoxWithConstraints {
-                modifier = Modifier()
+                modifier = Modifier
                         .fillMaxWidth()
                         .height(CARD_HEIGHT_DP)
                         .padding({ horizontal = 12 })
@@ -751,7 +751,7 @@ function AnimationExample22()
                     )
 
                     Box {
-                        modifier = Modifier()
+                        modifier = Modifier
                                 .fillMaxSize()
                         -- bubbleDragInput
                                 .pointerInput("bubbleDrag", SNAP_UNLOCK_THRESHOLD_PX, function()
@@ -932,7 +932,7 @@ function AnimationExample22()
                                     end)
 
                                 end,
-                                modifier = Modifier()
+                                modifier = Modifier
                                         .align(Alignment.TopEnd)
                                         .padding({ top = 16, ["end"] = 16 }),
 
@@ -946,7 +946,7 @@ function AnimationExample22()
                                 lineHeight = 28,
                                 color = mainTextColor.value,
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier()
+                                modifier = Modifier
                                         .align(Alignment.Center)
                                         .offset({ y = (-50) })
                                         .graphicsLayer(function(graphicsLayerScope)
@@ -956,7 +956,7 @@ function AnimationExample22()
                             }
 
                             Box {
-                                modifier = Modifier()
+                                modifier = Modifier
                                         .fillMaxWidth()
                                         .offset(function()
                                     return IntOffset(0, roundToInt(stateObj:textYOffsetPx()))
@@ -966,7 +966,7 @@ function AnimationExample22()
                                 content = function()
                                     Column {
                                         horizontalAlignment = Alignment.CenterHorizontally,
-                                        modifier = Modifier()
+                                        modifier = Modifier
                                                 .graphicsLayer(function(graphicsLayerScope)
                                             graphicsLayerScope.alpha = coerceIn(stateObj:progress() * 3, 0, 1)
                                         end),
@@ -985,7 +985,7 @@ function AnimationExample22()
                                                 lineHeight = 18,
                                                 textAlign = TextAlign.Center,
                                                 color = subtitleColor.value,
-                                                modifier = Modifier().padding({ top = 8 }),
+                                                modifier = Modifier.padding({ top = 8 }),
 
 
                                             }
@@ -1012,7 +1012,7 @@ function AnimationExample22()
             Text {
                 text = "Soap bubble drag with thin-film interference. Tweak Kotlin radii / spring values for the feel, or edit the AGSL constants (THICKNESS_BASE, COLOR_INTENSITY, EDGE_FADE_END...) inside SHADER_SRC for the optics.",
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier().padding({ horizontal = 16 }),
+                modifier = Modifier.padding({ horizontal = 16 }),
             }
 
         end -- Column content

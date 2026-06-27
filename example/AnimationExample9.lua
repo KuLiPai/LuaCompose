@@ -98,18 +98,18 @@ function AnimationExample9()
     end)
 
     Column {
-        modifier = Modifier().fillMaxWidth().padding(dp(16)),
+        modifier = Modifier.fillMaxWidth().padding(dp(16)),
         verticalArrangement = Arrangement.spacedBy(dp(16)),
         content = function()
             Text { text = "Spring Drag Box", fontWeight = FontWeight.SemiBold }
             Text { text = "Drag me, then release", fontSize = sp(12), color = Color(0xFF666666) }
             Text { text = "offset = (" .. tostring(offsetX.value) .. ", " .. tostring(offsetY.value) .. ")", fontSize = sp(10), color = Color(0xFF999999) }
             Box {
-                modifier = Modifier().fillMaxWidth().heightIn({ min = 280 }),
+                modifier = Modifier.fillMaxWidth().heightIn({ min = 280 }),
                 contentAlignment = Alignment.Center,
                 content = function()
                     Box {
-                        modifier = Modifier()
+                        modifier = Modifier
                                 .offset(function()
                             return IntOffset(math.floor(offsetX.value), math.floor(offsetY.value))
                         end)

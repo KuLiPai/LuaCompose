@@ -46,7 +46,7 @@ function AnimationExample2()
     local visible = state(true)
 
     Column {
-        modifier = Modifier().fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
             Text {
@@ -67,12 +67,12 @@ function AnimationExample2()
             }
 
             Row {
-                modifier = Modifier().fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12),
                 content = function()
                     DemoCell {
                         label = "SLIDE",
-                        modifier = Modifier().weight(1),
+                        modifier = Modifier.weight(1),
                         content = function()
                             AnimatedVisibility {
                                 visible = visible.value,
@@ -99,7 +99,7 @@ function AnimationExample2()
 
                     DemoCell {
                         label = "FADE",
-                        modifier = Modifier().weight(1),
+                        modifier = Modifier.weight(1),
                         content = function()
                             AnimatedVisibility {
                                 visible = visible.value,
@@ -114,7 +114,7 @@ function AnimationExample2()
 
                     DemoCell {
                         label = "SCALE",
-                        modifier = Modifier().weight(1),
+                        modifier = Modifier.weight(1),
                         content = function()
                             AnimatedVisibility {
                                 visible = visible.value,
@@ -162,7 +162,7 @@ function DemoCell(args)
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             }
             Box {
-                modifier = Modifier()
+                modifier = Modifier
                         .fillMaxWidth()
                         .height(96),
                 contentAlignment = Alignment.Center,
@@ -184,7 +184,7 @@ function AnimChip(args)
         content = function()
             Text {
                 text = text,
-                modifier = Modifier().padding(18, 14),
+                modifier = Modifier.padding(18, 14),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold,
             }

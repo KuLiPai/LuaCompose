@@ -111,7 +111,7 @@ function AnimationExample10()
     }
 
     Column {
-        modifier = Modifier().fillMaxWidth().padding(16),
+        modifier = Modifier.fillMaxWidth().padding(16),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
             Text {
@@ -179,7 +179,7 @@ function RaceTrack(args)
             }
 
             BoxWithConstraints {
-                modifier = Modifier()
+                modifier = Modifier
                         .fillMaxWidth()
                         .height(trackHeightDp)
                         .background({
@@ -192,7 +192,7 @@ function RaceTrack(args)
                     local trackWidthPx = (scope.maxWidth - runnerSizeDp) * densityValue
 
                     Box {
-                        modifier = Modifier()
+                        modifier = Modifier
                                 .align(Alignment.CenterStart)
                                 .padding({ horizontal = 0 })
                                 .offset(function()

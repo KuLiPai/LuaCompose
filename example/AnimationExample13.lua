@@ -51,12 +51,12 @@ function AnimationExample13()
     }
 
     Column {
-        modifier = Modifier().fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
             Text {
                 text = "Swipe the top card left or right",
-                modifier = Modifier().padding({ horizontal = 8 })
+                modifier = Modifier.padding({ horizontal = 8 })
             }
 
             local topIndex = state(0)
@@ -66,7 +66,7 @@ function AnimationExample13()
             local scope = rememberCoroutineScope()
 
             BoxWithConstraints {
-                modifier = Modifier().fillMaxWidth().height(360),
+                modifier = Modifier.fillMaxWidth().height(360),
                 contentAlignment = Alignment.Center,
                 content = function(boxWithConstraintsScope)
                     local densityValue = LocalDensity.current.density
@@ -96,7 +96,7 @@ function AnimationExample13()
                                 local scale = 1 - peek * 0.05
                                 local yOffset = peek * 12
                                 Card {
-                                    modifier = Modifier()
+                                    modifier = Modifier
                                             .fillMaxWidth(0.8)
                                             .height(300)
                                             .offset(function()
@@ -110,7 +110,7 @@ function AnimationExample13()
                                     colors = CardDefaults.cardColors({ containerColor = CARD_COLORS[peekIndex+1] }),
                                     content = function()
                                         Box {
-                                            modifier = Modifier().fillMaxSize(),
+                                            modifier = Modifier.fillMaxSize(),
                                             contentAlignment = Alignment.Center,
                                             content = function()
                                                 Text {
@@ -128,7 +128,7 @@ function AnimationExample13()
                         end
 
                         Card {
-                            modifier = Modifier()
+                            modifier = Modifier
                                     .fillMaxWidth(0.8)
                                     .height(300)
                                     .offset(
@@ -181,7 +181,7 @@ function AnimationExample13()
                             colors = CardDefaults.cardColors({ containerColor = CARD_COLORS[topIndex.value+1] }),
                             content = function()
                                 Box {
-                                    modifier = Modifier().fillMaxSize(),
+                                    modifier = Modifier.fillMaxSize(),
                                     contentAlignment = Alignment.Center,
                                     content = function()
                                         Text {

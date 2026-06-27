@@ -44,7 +44,7 @@ function AnimationExample1()
     }
 
     Column {
-        modifier = Modifier().fillMaxSize().padding(16),
+        modifier = Modifier.fillMaxSize().padding(16),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
 
@@ -55,7 +55,7 @@ function AnimationExample1()
                 color = MaterialTheme.colorScheme.onSurface,
             }
             Card {
-                modifier = Modifier()
+                modifier = Modifier
                         .fillMaxWidth()
                         .height(animatedHeight.value)
                         .clickable(function()
@@ -69,14 +69,14 @@ function AnimationExample1()
 
                 content = function()
                     Column {
-                        modifier = Modifier()
+                        modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(20),
                         verticalArrangement = Arrangement.spacedBy(8),
                         content = function()
 
                             Row {
-                                modifier = Modifier().fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                                 content = function()

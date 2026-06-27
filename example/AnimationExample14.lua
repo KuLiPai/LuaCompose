@@ -120,7 +120,7 @@ function AnimationExample14()
     local radiusPx = RADIUS_DP * density
 
     Column {
-        modifier = Modifier().fillMaxWidth().padding(16),
+        modifier = Modifier.fillMaxWidth().padding(16),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
             Text({
@@ -132,7 +132,7 @@ function AnimationExample14()
                 style = MaterialTheme.typography.bodySmall,
             })
             Box {
-                modifier = Modifier().fillMaxWidth().height(320),
+                modifier = Modifier.fillMaxWidth().height(320),
                 contentAlignment = Alignment.Center,
                 content = function()
                     for i, p in ipairs(progresses) do
@@ -150,7 +150,7 @@ function AnimationExample14()
                         local targetX = radiusPx * math.cos(rad)
                         local targetY = radiusPx * math.sin(rad)
                         Box {
-                            modifier = Modifier()
+                            modifier = Modifier
                                     .size(56)
                                     .graphicsLayer(function(graphicsLayerScope)
                                 local v = p.value
@@ -183,7 +183,7 @@ function AnimationExample14()
 
                     end -- for
                     Box {
-                        modifier = Modifier()
+                        modifier = Modifier
                                 .size(72)
                                 .clip(CircleShape)
                                 .background(MaterialTheme.colorScheme.primary)
@@ -197,7 +197,7 @@ function AnimationExample14()
                                 color = MaterialTheme.colorScheme.onPrimary,
                                 fontSize = 36,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier().graphicsLayer { rotationZ = fabRotation.value },
+                                modifier = Modifier.graphicsLayer { rotationZ = fabRotation.value },
                             })
                         end
                     } -- Box

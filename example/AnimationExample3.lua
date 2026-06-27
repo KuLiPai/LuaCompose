@@ -35,6 +35,7 @@ function AnimationExample3()
 
     local COLOR_TRANSITION_MS = 600
 
+
     local PALETTE = {
         { name = "Coral", color = Color(0xFF63CCD9) },
         { name = "Lime", color = Color(0xFFC6FF00) },
@@ -70,7 +71,7 @@ function AnimationExample3()
     }
 
     Column {
-        modifier = Modifier().fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
             Text {
@@ -80,7 +81,7 @@ function AnimationExample3()
             }
 
             Box {
-                modifier = Modifier()
+                modifier = Modifier
                         .fillMaxWidth()
                         .height(HERO_HEIGHT_DP)
                         .clip("rounded", 24)
@@ -98,13 +99,14 @@ function AnimationExample3()
             }
 
             Row {
-                modifier = Modifier().fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12),
                 content = function()
                     for i, t in PALETTE do
                         local index = i
+
                         Column {
-                            modifier = Modifier()
+                            modifier = Modifier
                                     .weight(1)
                                     .clickable(function()
                                 selectedIndex.value = index
@@ -114,7 +116,7 @@ function AnimationExample3()
                             verticalArrangement = Arrangement.spacedBy(6),
                             content = function()
                                 Box {
-                                    modifier = Modifier()
+                                    modifier = Modifier
                                             .size(48)
                                             .clip("circle")
                                             .background(t.color),
@@ -133,7 +135,7 @@ function AnimationExample3()
 
             Text {
                 text = "Tap a swatch to morph the hero color.",
-                modifier = Modifier().padding(0, 4, 0, 0),
+                modifier = Modifier.padding(0, 4, 0, 0),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
 

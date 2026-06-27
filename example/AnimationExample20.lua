@@ -80,11 +80,11 @@ function AnimationExample20()
     end)
 
     Column {
-        modifier = Modifier().fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12),
         content = function()
             BoxWithConstraints {
-                modifier = Modifier().fillMaxWidth().height(380),
+                modifier = Modifier.fillMaxWidth().height(380),
                 content = function(boxScope)
                     local densityValue = LocalDensity.current.density
                     local canvasWidthPx = boxScope.maxWidth * densityValue
@@ -96,7 +96,7 @@ function AnimationExample20()
                     local maxAngleRad = MAX_ANGLE_DEG * PI / 180.0
                     
                     Canvas {
-                        modifier = Modifier().fillMaxWidth().height(380),
+                        modifier = Modifier.fillMaxWidth().height(380),
                         onDraw = function(drawScope)
                             local touch = tick.value
                             

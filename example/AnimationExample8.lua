@@ -106,7 +106,7 @@ function AnimationExample8()
     end)
 
     Column {
-        modifier = Modifier().fillMaxWidth().padding(16),
+        modifier = Modifier.fillMaxWidth().padding(16),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
             Text {
@@ -115,11 +115,11 @@ function AnimationExample8()
             }
 
             Box {
-                modifier = Modifier().fillMaxWidth().heightIn({ min = 280 }),
+                modifier = Modifier.fillMaxWidth().heightIn({ min = 280 }),
                 contentAlignment = Alignment.Center,
                 content = function()
                     Canvas {
-                        modifier = Modifier().size(SPINNER_SIZE_DP),
+                        modifier = Modifier.size(SPINNER_SIZE_DP),
                         onDraw = function(drawScope)
                             local density = drawScope.density
                             local strokePx = SPINNER_STROKE_DP.value * density -- Approx toPx Warn实验性的，因为原本是value,但是lua的不能扩展方法，这里给state扩展了

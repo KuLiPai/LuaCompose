@@ -51,12 +51,12 @@ function AnimationExample5()
 
     local count = state(0)
     Column {
-        modifier = Modifier().fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
 
             Box {
-                modifier = Modifier()
+                modifier = Modifier
                         .fillMaxWidth()
                         .height(160),
                 contentAlignment = Alignment.Center,
@@ -123,7 +123,7 @@ function AnimationExample5()
             }
 
             Row {
-                modifier = Modifier().fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16, Alignment.CenterHorizontally),
                 content = function()
                     Button {

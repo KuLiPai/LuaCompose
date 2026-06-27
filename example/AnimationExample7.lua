@@ -97,7 +97,7 @@ function AnimationExample7()
     end)
 
     Column {
-        modifier = Modifier().fillMaxWidth().padding(16),
+        modifier = Modifier.fillMaxWidth().padding(16),
         verticalArrangement = Arrangement.spacedBy(16),
         content = function()
             Text {
@@ -107,13 +107,13 @@ function AnimationExample7()
             }
 
             Box {
-                modifier = Modifier().fillMaxWidth().heightIn{min = 280 },
+                modifier = Modifier.fillMaxWidth().heightIn{min = 280 },
                 contentAlignment = Alignment.Center,
                 content = function()
                     Text {
                         text = "♥",
                         fontSize = HEART_FONT_SIZE_SP,
-                        modifier = Modifier()
+                        modifier = Modifier
                                 .scale(scale.value)
                                 .alpha(alpha.value),
                     }

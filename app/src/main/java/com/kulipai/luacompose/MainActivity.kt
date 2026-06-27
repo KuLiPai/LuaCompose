@@ -27,6 +27,7 @@ import org.luaj.lib.jse.CoerceJavaToLua
 import org.luaj.lib.jse.JsePlatform
 import java.io.File
 import android.util.Log
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,14 +49,44 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun LuaAppRunner(context: Context) {
+    val coroutineScope = rememberCoroutineScope()
     var reloadTrigger by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var rootScope by remember { mutableStateOf<ComposeScope?>(null) }
 
+    val externalDir = remember(context) {
+        context.getExternalFilesDir(null)
+    }
+
+    // 自动监听 main.lua 文件变化并触发热重载
+    DisposableEffect(externalDir) {
+        if (externalDir == null) return@DisposableEffect onDispose {}
+
+        val observer = object : android.os.FileObserver(
+            externalDir.absolutePath,
+            android.os.FileObserver.CLOSE_WRITE
+        ) {
+            override fun onEvent(event: Int, path: String?) {
+                if (path == "main.lua") {
+                    Log.d("LUA_HOT_RELOAD", "Detected CLOSE_WRITE on main.lua, auto-reloading...")
+                    coroutineScope.launch {
+                        reloadTrigger++
+                    }
+                }
+            }
+        }
+        observer.startWatching()
+        Log.d("LUA_HOT_RELOAD", "Started FileObserver watching dir: ${externalDir.absolutePath}")
+
+        onDispose {
+            observer.stopWatching()
+            Log.d("LUA_HOT_RELOAD", "Stopped FileObserver")
+        }
+    }
+
     // 当 reloadTrigger 变化时，重新从 SD 卡加载 Lua 代码
     LaunchedEffect(reloadTrigger) {
         try {
-    
             errorMessage = null
             rootScope = loadLuaScope(context)
         } catch (e: Exception) {

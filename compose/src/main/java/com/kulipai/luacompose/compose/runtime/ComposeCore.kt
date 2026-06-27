@@ -363,13 +363,6 @@ object ComposeBridge {
         val instanceMeta = engine.createTable()
         val customProperties = engine.createTable()
         
-        instanceMeta.set("__newindex", engine.createFunction { args ->
-            val key = args[1]
-            val value = args[2]
-            customProperties.set(key, value)
-            engine.createNil()
-        })
-        
         instanceMeta.set("__index", engine.createFunction { args ->
             val keyArg = args[1]
             val key = keyArg.toStringValue()
@@ -506,7 +499,7 @@ object ComposeBridge {
             } catch (e: Exception) {
                 android.util.Log.e("LUA_REFLECTION", "Error setting $key on obj class ${obj.javaClass}", e)
             }
-            args[0].asTable().rawset(key, value)
+            customProperties.set(args[1], value)
             engine.createNil()
         })
         

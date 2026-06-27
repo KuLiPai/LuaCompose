@@ -163,12 +163,19 @@ object LuaComposeLib {
             scope.getOrCreateDerivedState(args[0].asFunction())
         })
         composeTable.set("LaunchedEffect", ComposeBridge.engine.createFunction { args ->
-            val effectFunc = args[0]
+            if (args.isEmpty()) throw RuntimeException("compose.LaunchedEffect() requires a callback function")
+            val effectFunc = args.last()
             val activeScope = ComposeBridge.getActiveScope()
             if (activeScope != null && effectFunc.isFunction()) {
-                val key = "effect_${effectFunc.hashCode()}"
-                if (activeScope.effectStates[key] == null) {
-                    activeScope.effectStates[key] = true
+                val index = activeScope.launchedEffectsCount++
+                val keys = args.dropLast(1).map { ComposeBridge.scriptToJava(it) }
+                val oldKeys = activeScope.launchedEffectKeys[index]
+                
+                if (oldKeys != keys || !activeScope.launchedEffectJobs.containsKey(index)) {
+                    // Cancel old job if exists
+                    activeScope.launchedEffectJobs[index]?.cancel()
+                    activeScope.launchedEffectKeys[index] = keys
+                    
                     activeScope.coroutineScope?.let { coroutineScope ->
                         val coroutineCreate = env.get("coroutine").asTable().get("create").asFunction()
                         val coroutineResume = env.get("coroutine").asTable().get("resume").asFunction()
@@ -177,7 +184,7 @@ object LuaComposeLib {
                         val luaThread = coroutineCreate.call(effectFunc)
                         
                         fun resumeLoop(arg: ScriptValue) {
-                            coroutineScope.launch {
+                            val job = coroutineScope.launch {
                                 try {
                                     val result = coroutineResume.call(luaThread, arg)
                                     if (result.isBoolean() && result.toBoolean()) {
@@ -194,6 +201,7 @@ object LuaComposeLib {
                                     e.printStackTrace()
                                 }
                             }
+                            activeScope.launchedEffectJobs[index] = job
                         }
                         
                         resumeLoop(ComposeBridge.engine.createNil())

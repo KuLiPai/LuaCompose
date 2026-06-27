@@ -52,6 +52,16 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     var weightVal: Float? = null
     var weightFill: Boolean = true
 
+    fun copy(newModifier: Modifier = this.modifier): LuaModifier {
+        val next = LuaModifier(newModifier)
+        next.alignmentStr = this.alignmentStr
+        next.alignObject = this.alignObject
+        next.weightVal = this.weightVal
+        next.weightFill = this.weightFill
+        return next
+    }
+
+
     fun padding(dpOrTable: Any): LuaModifier {
         val unwrapped = ComposeBridge.unwrapAny(dpOrTable)
         if (unwrapped is Map<*, *>) {
@@ -71,24 +81,24 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             }
             return this
         }
-        modifier = modifier.padding(resolveDp(unwrapped)); return this
+        return copy(modifier.padding(resolveDp(unwrapped)))
     }
 
     fun padding(horizontal: Any, vertical: Any): LuaModifier {
-        modifier = modifier.padding(resolveDp(horizontal), resolveDp(vertical)); return this
+        return copy(modifier.padding(resolveDp(horizontal), resolveDp(vertical)))
     }
 
     fun padding(start: Any, top: Any, end: Any, bottom: Any): LuaModifier {
-        modifier = modifier.padding(
+        val nextMod = modifier.padding(
             resolveDp(start),
             resolveDp(top),
             resolveDp(end),
             resolveDp(bottom)
-        ); return this
+        ); return copy(nextMod)
     }
 
     fun fillMaxSize(): LuaModifier {
-        modifier = modifier.fillMaxSize(); return this
+        return copy(modifier.fillMaxSize())
     }
 
     fun fillMaxSize(fractionRaw: Any): LuaModifier {
@@ -100,12 +110,12 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         } else if (unwrapped is Number) {
             fraction = unwrapped.toFloat()
         }
-        modifier = modifier.fillMaxSize(fraction)
-        return this
+        return copy(modifier.fillMaxSize(fraction))
+        
     }
 
     fun fillMaxWidth(): LuaModifier {
-        modifier = modifier.fillMaxWidth(); return this
+        return copy(modifier.fillMaxWidth())
     }
 
     fun fillMaxWidth(fractionRaw: Any): LuaModifier {
@@ -117,12 +127,12 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         } else if (unwrapped is Number) {
             fraction = unwrapped.toFloat()
         }
-        modifier = modifier.fillMaxWidth(fraction)
-        return this
+        return copy(modifier.fillMaxWidth(fraction))
+        
     }
 
     fun fillMaxHeight(): LuaModifier {
-        modifier = modifier.fillMaxHeight(); return this
+        return copy(modifier.fillMaxHeight())
     }
 
     fun fillMaxHeight(fractionRaw: Any): LuaModifier {
@@ -134,8 +144,8 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         } else if (unwrapped is Number) {
             fraction = unwrapped.toFloat()
         }
-        modifier = modifier.fillMaxHeight(fraction)
-        return this
+        return copy(modifier.fillMaxHeight(fraction))
+        
     }
 
     fun size(size: Any): LuaModifier {
@@ -145,24 +155,24 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             val height = unwrapped["height"] ?: unwrapped[2.0] ?: unwrapped[2]
             if (width != null || height != null) return size(width ?: 0, height ?: 0)
         }
-        modifier = modifier.size(resolveDp(unwrapped))
-        return this
+        return copy(modifier.size(resolveDp(unwrapped)))
+        
     }
 
     fun size(width: Any, height: Any): LuaModifier {
-        modifier = modifier.size(resolveDp(width), resolveDp(height)); return this
+        return copy(modifier.size(resolveDp(width), resolveDp(height)))
     }
 
     fun width(width: Any): LuaModifier {
-        modifier = modifier.width(resolveDp(width)); return this
+        return copy(modifier.width(resolveDp(width)))
     }
 
     fun height(height: Any): LuaModifier {
-        modifier = modifier.height(resolveDp(height)); return this
+        return copy(modifier.height(resolveDp(height)))
     }
 
     fun wrapContentSize(): LuaModifier {
-        modifier = modifier.wrapContentSize(); return this
+        return copy(modifier.wrapContentSize())
     }
 
     fun background(colorProp: Any): LuaModifier {
@@ -198,11 +208,11 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun alpha(alpha: Float): LuaModifier {
-        modifier = modifier.alpha(alpha); return this
+        return copy(modifier.alpha(alpha))
     }
 
     fun aspectRatio(ratio: Float): LuaModifier {
-        modifier = modifier.aspectRatio(ratio); return this
+        return copy(modifier.aspectRatio(ratio))
     }
 
     fun rotate(degrees: Any): LuaModifier {
@@ -219,7 +229,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun offset(x: Any, y: Any): LuaModifier {
-        modifier = modifier.offset(resolveDp(x), resolveDp(y)); return this
+        return copy(modifier.offset(resolveDp(x), resolveDp(y)))
     }
 
     fun offset(tableRaw: Any): LuaModifier {
@@ -278,17 +288,17 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun animateContentSize(): LuaModifier {
-        modifier = modifier.animateContentSize()
-        return this
+        return copy(modifier.animateContentSize())
+        
     }
 
     @OptIn(ExperimentalSharedTransitionApi::class)
     fun sharedElement(config: Any): LuaModifier {
         val scope = ComposeBridge.getActiveSharedTransitionScope() 
             ?: ComposeBridge.findContextReceiver<androidx.compose.animation.SharedTransitionScope>() 
-            ?: return this
+            ?: return copy()
         val unwrapped = ComposeBridge.unwrapAny(config)
-        val map = unwrapped as? Map<*, *> ?: return this
+        val map = unwrapped as? Map<*, *> ?: return copy()
         val visibilityScope = (
             ComposeBridge.unwrapAny(map["animatedVisibilityScope"])
                 as? androidx.compose.animation.AnimatedVisibilityScope
@@ -297,9 +307,9 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                 as? androidx.compose.animation.AnimatedVisibilityScope
             ) ?: ComposeBridge.getActiveAnimatedVisibilityScope()
             ?: ComposeBridge.findContextReceiver<androidx.compose.animation.AnimatedVisibilityScope>()
-            ?: return this
+            ?: return copy()
         val state = ComposeBridge.unwrapAny(map["sharedContentState"]) as? SharedTransitionScope.SharedContentState
-            ?: return this
+            ?: return copy()
 
         val boundsTransform = when (val raw = map["boundsTransform"]) {
             is Function2<*, *, *> -> {
@@ -549,13 +559,13 @@ class LuaModifier(var modifier: Modifier = Modifier) {
 
 
     fun widthIn(): LuaModifier {
-        modifier = modifier.widthIn()
-        return this
+        return copy(modifier.widthIn())
+        
     }
 
     fun widthIn(min: Any, max: Any): LuaModifier {
-        modifier = modifier.widthIn(resolveDp(min), resolveDp(max))
-        return this
+        return copy(modifier.widthIn(resolveDp(min), resolveDp(max)))
+        
     }
 
     fun widthIn(table: Any): LuaModifier {
@@ -574,13 +584,13 @@ class LuaModifier(var modifier: Modifier = Modifier) {
 
 
     fun heightIn(): LuaModifier {
-        modifier = modifier.heightIn()
-        return this
+        return copy(modifier.heightIn())
+        
     }
 
     fun heightIn(min: Any, max: Any): LuaModifier {
-        modifier = modifier.heightIn(resolveDp(min), resolveDp(max))
-        return this
+        return copy(modifier.heightIn(resolveDp(min), resolveDp(max)))
+        
     }
 
     fun heightIn(table: Any): LuaModifier {
@@ -599,8 +609,8 @@ class LuaModifier(var modifier: Modifier = Modifier) {
 
 
     fun sizeIn(): LuaModifier {
-        modifier = modifier.sizeIn()
-        return this
+        return copy(modifier.sizeIn())
+        
     }
 
     fun sizeIn(
@@ -609,13 +619,13 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         maxWidth: Any,
         maxHeight: Any
     ): LuaModifier {
-        modifier = modifier.sizeIn(
+        val nextMod = modifier.sizeIn(
             resolveDp(minWidth),
             resolveDp(minHeight),
             resolveDp(maxWidth),
             resolveDp(maxHeight),
         )
-        return this
+        return copy(nextMod)
     }
 
     fun sizeIn(table: Any): LuaModifier {
@@ -646,11 +656,11 @@ class LuaModifier(var modifier: Modifier = Modifier) {
 
     // compose.ui.draw
     fun scale(scale: Float): LuaModifier {
-        modifier = modifier.scale(scale); return this
+        return copy(modifier.scale(scale))
     }
 
     fun scale(scaleX: Float, scaleY: Float): LuaModifier {
-        modifier = modifier.scale(scaleX, scaleY); return this
+        return copy(modifier.scale(scaleX, scaleY))
     }
 
     fun drawBehind(blockRaw: Any): LuaModifier {

@@ -121,8 +121,10 @@ object LuaComposeLib {
 
         composeTable.set("delay", ComposeBridge.engine.createFunction { args ->
             val ms = args[0].toLong()
-            kotlinx.coroutines.runBlocking {
-                kotlinx.coroutines.delay(ms)
+            val yieldFunc = env.get("coroutine").asTable().get("yield").asFunction()
+            val startTime = System.currentTimeMillis()
+            while (System.currentTimeMillis() - startTime < ms) {
+                yieldFunc.call(ComposeBridge.engine.createNil())
             }
             ComposeBridge.engine.createNil()
         })
@@ -183,6 +185,36 @@ object LuaComposeLib {
                         
                         val luaThread = coroutineCreate.call(effectFunc)
                         
+                        val coroutineScopeTable = ComposeBridge.engine.createTable()
+                        coroutineScopeTable.set("launch", ComposeBridge.engine.createFunction { launchArgs ->
+                            val isMethodCall = launchArgs.getOrNull(0) == coroutineScopeTable
+                            val block = if (isMethodCall) launchArgs.getOrNull(1) else launchArgs.getOrNull(0)
+                            if (block != null && block.isFunction()) {
+                                val childThread = coroutineCreate.call(block)
+                                fun childResumeLoop(childArg: ScriptValue) {
+                                    coroutineScope.launch {
+                                        try {
+                                            val childResult = coroutineResume.call(childThread, childArg)
+                                            if (childResult.isBoolean() && childResult.toBoolean()) {
+                                                val status = coroutineStatus.call(childThread)
+                                                if (status.isString() && status.toStringValue() == "suspended") {
+                                                    androidx.compose.runtime.withFrameNanos { frameTime ->
+                                                        childResumeLoop(ComposeBridge.engine.createValue(frameTime.toDouble()))
+                                                    }
+                                                }
+                                            } else {
+                                                System.err.println("Coroutine error in scope.launch: " + childResult.toStringValue())
+                                            }
+                                        } catch (e: Exception) {
+                                            e.printStackTrace()
+                                        }
+                                    }
+                                }
+                                childResumeLoop(ComposeBridge.engine.createNil())
+                            }
+                            ComposeBridge.engine.createNil()
+                        })
+                        
                         fun resumeLoop(arg: ScriptValue) {
                             val job = coroutineScope.launch {
                                 try {
@@ -195,7 +227,7 @@ object LuaComposeLib {
                                             }
                                         }
                                     } else {
-                                        System.err.println("Coroutine error")
+                                        System.err.println("Coroutine error: " + result.toStringValue())
                                     }
                                 } catch (e: Exception) {
                                     e.printStackTrace()
@@ -204,7 +236,7 @@ object LuaComposeLib {
                             activeScope.launchedEffectJobs[index] = job
                         }
                         
-                        resumeLoop(ComposeBridge.engine.createNil())
+                        resumeLoop(coroutineScopeTable)
                     }
                 }
             }
@@ -362,53 +394,7 @@ object LuaComposeLib {
             table
         })
 
-        composeTable.set("LaunchedEffect", ComposeBridge.engine.createFunction { args ->
-            val scope = ComposeBridge.getActiveScope() ?: return@createFunction ComposeBridge.engine.createNil()
-            val numArgs = args.size
-            if (numArgs == 0) return@createFunction ComposeBridge.engine.createNil()
-            
-            val effectFunc = args[numArgs - 1]
-            if (effectFunc.isFunction()) {
-                val keys = mutableListOf<Any?>()
-                for (i in 0 until numArgs - 1) {
-                    keys.add(ComposeBridge.scriptToJava(args[i]))
-                }
-                val effectKey = "launched_effect_${keys.hashCode()}"
-                if (scope.effectStates[effectKey] == null) {
-                    scope.effectStates[effectKey] = true
-                    scope.coroutineScope?.let { coroutineScope ->
-                        val coroutineCreate = env.get("coroutine").asTable().get("create").asFunction()
-                        val coroutineResume = env.get("coroutine").asTable().get("resume").asFunction()
-                        val coroutineStatus = env.get("coroutine").asTable().get("status").asFunction()
-                        
-                        val luaThread = coroutineCreate.call(effectFunc)
-                        
-                        fun resumeLoop(arg: ScriptValue) {
-                            coroutineScope.launch {
-                                try {
-                                    val result = coroutineResume.call(luaThread, arg)
-                                    if (result.isBoolean() && result.toBoolean()) {
-                                        val status = coroutineStatus.call(luaThread)
-                                        if (status.isString() && status.toStringValue() == "suspended") {
-                                            androidx.compose.runtime.withFrameNanos { frameTime ->
-                                                resumeLoop(ComposeBridge.engine.createValue(frameTime.toDouble()))
-                                            }
-                                        }
-                                    } else {
-                                        System.err.println("Coroutine error")
-                                    }
-                                } catch (e: Exception) {
-                                    e.printStackTrace()
-                                }
-                            }
-                        }
-                        
-                        resumeLoop(ComposeBridge.engine.createNil())
-                    }
-                }
-            }
-            ComposeBridge.engine.createNil()
-        })
+
 
         composeTable.set("DisposableEffect", ComposeBridge.engine.createFunction { args ->
             val effectFunc = args[0]

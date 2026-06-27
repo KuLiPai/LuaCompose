@@ -55,6 +55,7 @@ fun LuaAppRunner(context: Context) {
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var rootScope by remember { mutableStateOf<ComposeScope?>(null) }
     var globalGlobals by remember { mutableStateOf<Globals?>(null) }
+    var isHotReloadEnabled by remember { mutableStateOf(true) }
 
     val externalDir = remember(context) {
         context.getExternalFilesDir(null)
@@ -70,9 +71,13 @@ fun LuaAppRunner(context: Context) {
         ) {
             override fun onEvent(event: Int, path: String?) {
                 if (path == "main.lua") {
-                    Log.d("LUA_HOT_RELOAD", "Detected CLOSE_WRITE on main.lua, auto-reloading (hot)...")
+                    Log.d("LUA_HOT_RELOAD", "Detected CLOSE_WRITE on main.lua, auto-reloading (hot=${isHotReloadEnabled})...")
                     coroutineScope.launch {
-                        hotReloadTrigger++
+                        if (isHotReloadEnabled) {
+                            hotReloadTrigger++
+                        } else {
+                            reloadTrigger++
+                        }
                     }
                 }
             }
@@ -127,13 +132,22 @@ fun LuaAppRunner(context: Context) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Lua Compose Live",
+                text = "Lua Compose",
                 style = MaterialTheme.typography.titleLarge
             )
-            Button(
-                onClick = { reloadTrigger++ }
-            ) {
-                Text("Reload")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "Live", style = MaterialTheme.typography.labelLarge)
+                Spacer(modifier = Modifier.width(4.dp))
+                Switch(
+                    checked = isHotReloadEnabled,
+                    onCheckedChange = { isHotReloadEnabled = it }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = { reloadTrigger++ }
+                ) {
+                    Text("Reload")
+                }
             }
         }
 

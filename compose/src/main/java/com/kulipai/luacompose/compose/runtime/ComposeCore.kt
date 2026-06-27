@@ -361,8 +361,37 @@ object ComposeBridge {
         instance.set("_javaObj", engine.createUserdata(obj))
         
         val instanceMeta = engine.createTable()
+        val customProperties = engine.createTable()
+        
+        instanceMeta.set("__newindex", engine.createFunction { args ->
+            val key = args[1]
+            val value = args[2]
+            customProperties.set(key, value)
+            engine.createNil()
+        })
+        
         instanceMeta.set("__index", engine.createFunction { args ->
-            val key = args[1].toStringValue()
+            val keyArg = args[1]
+            val key = keyArg.toStringValue()
+            
+            val customVal = customProperties.get(keyArg)
+            if (customVal != null && !customVal.isNil()) {
+                if (customVal.isFunction()) {
+                    return@createFunction engine.createFunction { funcArgs ->
+                        val isSelf = funcArgs.getOrNull(0)?.isTable() == true && 
+                                     !funcArgs.getOrNull(0)!!.asTable().get("_javaObj").isNil() && 
+                                     obj.javaClass.isInstance(funcArgs.getOrNull(0)!!.asTable().get("_javaObj").asUserdata())
+                        if (isSelf) {
+                            return@createFunction customVal.asFunction().call(*funcArgs)
+                        } else {
+                            val wrappedSelf = javaToScript(obj)
+                            val newArgs = arrayOf(wrappedSelf) + funcArgs
+                            return@createFunction customVal.asFunction().call(*newArgs)
+                        }
+                    }
+                }
+                return@createFunction customVal
+            }
             try {
                 val cache = getReflectionCache(obj.javaClass)
                 

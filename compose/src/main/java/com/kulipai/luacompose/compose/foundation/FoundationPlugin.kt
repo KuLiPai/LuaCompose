@@ -31,7 +31,7 @@ class FoundationPlugin : ComposeScriptPlugin {
 
         val globalModifier = ComposeBridge.javaToScript(com.kulipai.luacompose.compose.ui.LuaModifier())
         ComposeBridge.registerExtension("com.kulipai.luacompose.compose.ui.LuaModifier", globalModifier.asTable())
-        val modifierMeta = ComposeBridge.engine.createTable()
+        val modifierMeta = globalModifier.asTable().getMetatable() ?: ComposeBridge.engine.createTable()
         modifierMeta.set("__call", ComposeBridge.engine.createFunction { _ ->
             ComposeBridge.javaToScript(com.kulipai.luacompose.compose.ui.LuaModifier())
         })

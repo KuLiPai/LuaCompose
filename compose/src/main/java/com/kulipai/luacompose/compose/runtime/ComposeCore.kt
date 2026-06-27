@@ -665,6 +665,12 @@ class ComposeScope(var contentFunc: ScriptFunction) {
     internal val launchedEffectJobs = mutableMapOf<Int, kotlinx.coroutines.Job>()
     internal var launchedEffectsCount = 0
 
+    fun restartLaunchedEffects() {
+        launchedEffectKeys.clear()
+        launchedEffectJobs.values.forEach { it.cancel() }
+        launchedEffectJobs.clear()
+    }
+
     internal val accessedStates = mutableSetOf<Any>()
     internal val accessedRemembers = mutableSetOf<Any>()
     internal val accessedChildScopes = mutableSetOf<Any>()

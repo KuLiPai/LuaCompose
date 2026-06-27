@@ -51,8 +51,10 @@ class MainActivity : ComponentActivity() {
 fun LuaAppRunner(context: Context) {
     val coroutineScope = rememberCoroutineScope()
     var reloadTrigger by remember { mutableIntStateOf(0) }
+    var hotReloadTrigger by remember { mutableIntStateOf(0) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var rootScope by remember { mutableStateOf<ComposeScope?>(null) }
+    var globalGlobals by remember { mutableStateOf<Globals?>(null) }
 
     val externalDir = remember(context) {
         context.getExternalFilesDir(null)
@@ -68,9 +70,9 @@ fun LuaAppRunner(context: Context) {
         ) {
             override fun onEvent(event: Int, path: String?) {
                 if (path == "main.lua") {
-                    Log.d("LUA_HOT_RELOAD", "Detected CLOSE_WRITE on main.lua, auto-reloading...")
+                    Log.d("LUA_HOT_RELOAD", "Detected CLOSE_WRITE on main.lua, auto-reloading (hot)...")
                     coroutineScope.launch {
-                        reloadTrigger++
+                        hotReloadTrigger++
                     }
                 }
             }
@@ -84,15 +86,34 @@ fun LuaAppRunner(context: Context) {
         }
     }
 
-    // 当 reloadTrigger 变化时，重新从 SD 卡加载 Lua 代码
+    // Full Reload (button)
     LaunchedEffect(reloadTrigger) {
         try {
             errorMessage = null
-            rootScope = loadLuaScope(context)
+            val result = loadLuaScope(context, null, null)
+            globalGlobals = result.first
+            rootScope = result.second
         } catch (e: Exception) {
             e.printStackTrace()
             errorMessage = e.message ?: e.toString()
             rootScope = null
+            globalGlobals = null
+        }
+    }
+
+    // Hot Reload (file save)
+    LaunchedEffect(hotReloadTrigger) {
+        if (hotReloadTrigger == 0) return@LaunchedEffect
+        try {
+            errorMessage = null
+            val result = loadLuaScope(context, globalGlobals, rootScope)
+            globalGlobals = result.first
+            rootScope = result.second
+        } catch (e: Exception) {
+            e.printStackTrace()
+            errorMessage = e.message ?: e.toString()
+            // In case of error during hot reload, keep the old UI visible instead of completely breaking,
+            // or show the error message. Here we show error.
         }
     }
 
@@ -144,22 +165,20 @@ fun LuaAppRunner(context: Context) {
 }
 
 // 动态读取并加载 Lua 执行环境
-fun loadLuaScope(context: Context): ComposeScope {
+fun loadLuaScope(context: Context, existingGlobals: Globals?, existingScope: ComposeScope?): Pair<Globals, ComposeScope> {
     try {
         // 1. 初始化 luaj++ 虚拟机环境
-        val globals: Globals = JsePlatform.standardGlobals()
-
-        // 2. 初始化 Kotlin 侧实现的 Compose DSL 库
-        ComposeBridge.engine = LuajEngine
-        ComposeBridge.luaValueUnwrapper = { value ->
-            if (value is org.luaj.LuaValue) {
-                ComposeBridge.scriptToJava(LuajEngine.wrap(value))
-            } else value
+        val globals = existingGlobals ?: JsePlatform.standardGlobals().also { g ->
+            // 2. 初始化 Kotlin 侧实现的 Compose DSL 库
+            ComposeBridge.engine = LuajEngine
+            ComposeBridge.luaValueUnwrapper = { value ->
+                if (value is org.luaj.LuaValue) {
+                    ComposeBridge.scriptToJava(LuajEngine.wrap(value))
+                } else value
+            }
+            val env = LuajEngine.wrap(g).asTable()
+            LuaComposeLib.inject(env)
         }
-        val env = LuajEngine.wrap(globals).asTable()
-        LuaComposeLib.inject(env)
-
-
 
         // 4. 定位外置存储路径 /sdcard/Android/data/<packagename>/files/
         val externalDir = context.getExternalFilesDir(null)
@@ -249,6 +268,9 @@ fun loadLuaScope(context: Context): ComposeScope {
             "LUA_SCRIPT",
             "Loading ${mainLuaFile.absolutePath} bytes=${scriptContent.length} firstLine=${scriptContent.lineSequence().firstOrNull()}"
         )
+        
+        // Clear root function before load so we get the new one
+        LuaComposeLib.rootContentFunc = null
         val userScriptResult = globals.load(scriptContent, "main.lua").call()
 
         // 6. 优先从 compose.rootContentFunc 读取布局函数，其次从脚本返回值中读取
@@ -256,12 +278,24 @@ fun loadLuaScope(context: Context): ComposeScope {
             ?: (LuajEngine.wrap(userScriptResult).takeIf { it.isFunction() }?.asFunction())
             ?: throw RuntimeException("请使用 compose.setContent(function) 设置布局，或者在 main.lua 结尾返回布局函数")
 
-        LuaComposeLib.clearRuntimeState()
-
-        // 7. 创建 Kotlin 侧的 ComposeScope
-        return ComposeScope(rootLuaFunction)
+        if (existingScope != null) {
+            // 热重载逻辑
+            existingScope.contentFunc = rootLuaFunction
+            
+            // 重新启动 LaunchedEffect 任务，以便应用速度等新逻辑
+            existingScope.restartLaunchedEffects()
+            
+            existingScope.invalidate() // Trigger recomposition
+            return Pair(globals, existingScope)
+        } else {
+            // 全新重载逻辑
+            LuaComposeLib.clearRuntimeState()
+            return Pair(globals, ComposeScope(rootLuaFunction))
+        }
     } catch (e: Exception) {
-        LuaComposeLib.clearRuntimeState()
+        if (existingGlobals == null) {
+            LuaComposeLib.clearRuntimeState()
+        }
         throw e
     }
 }

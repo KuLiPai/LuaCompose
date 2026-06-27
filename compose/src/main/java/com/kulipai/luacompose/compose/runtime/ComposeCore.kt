@@ -423,7 +423,7 @@ object ComposeBridge {
                             return@createFunction engine.createFunction { funcArgs ->
                                 val isSelf = funcArgs.getOrNull(0)?.isTable() == true && 
                                              !funcArgs.getOrNull(0)!!.asTable().get("_javaObj").isNil() && 
-                                             funcArgs.getOrNull(0)!!.asTable().get("_javaObj").asUserdata() === obj
+                                             obj.javaClass.isInstance(funcArgs.getOrNull(0)!!.asTable().get("_javaObj").asUserdata())
                                 
                                 if (isSelf) {
                                     return@createFunction luaVal.asFunction().call(*funcArgs)

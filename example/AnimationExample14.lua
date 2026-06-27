@@ -154,7 +154,6 @@ function AnimationExample14()
                                     .size(56)
                                     .graphicsLayer(function(graphicsLayerScope)
                                 local v = p.value
-                                print(v)
                                 graphicsLayerScope.translationX = targetX * v
                                 graphicsLayerScope.translationY = targetY * v
                                 local s = 0.4 + 0.6 * v

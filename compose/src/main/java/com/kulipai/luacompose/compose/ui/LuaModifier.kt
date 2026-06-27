@@ -46,7 +46,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 // --- 3. 极其优雅的链式 Modifier 封装 ---
-class LuaModifier(var modifier: Modifier = Modifier) {
+class LuaModifier(val modifier: Modifier = Modifier) {
     var alignmentStr: String? = null
     var alignObject: Any? = null
     var weightVal: Float? = null
@@ -176,6 +176,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun background(colorProp: Any): LuaModifier {
+        var nextModifier = modifier
         val unwrapped = ComposeBridge.unwrapAny(colorProp)
         if (unwrapped is Map<*, *>) {
             val color = unwrapped["color"] ?: unwrapped[1.0] ?: unwrapped[1]
@@ -186,25 +187,26 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             }
         }
         try {
-            modifier = modifier.background(resolveColor(unwrapped))
+            nextModifier = nextModifier.background(resolveColor(unwrapped))
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        return this
+        return copy(nextModifier)
     }
 
     fun background(colorProp: Any, shapeProp: Any): LuaModifier {
+        var nextModifier = modifier
         val resolvedShape = resolveShape(shapeProp)
         try {
             if (resolvedShape != null) {
-                modifier = modifier.background(resolveColor(colorProp), resolvedShape)
+                nextModifier = nextModifier.background(resolveColor(colorProp), resolvedShape)
             } else {
-                modifier = modifier.background(resolveColor(colorProp))
+                nextModifier = nextModifier.background(resolveColor(colorProp))
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        return this
+        return copy(nextModifier)
     }
 
     fun alpha(alpha: Float): LuaModifier {
@@ -216,16 +218,17 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun rotate(degrees: Any): LuaModifier {
+        var nextModifier = modifier
         val unwrapped = ComposeBridge.unwrapAny(degrees)
         if (unwrapped is Map<*, *>) {
             val deg = unwrapped["degrees"] ?: unwrapped[1.0] ?: unwrapped[1]
             if (deg is Number) {
-                modifier = modifier.rotate(deg.toFloat())
+                nextModifier = nextModifier.rotate(deg.toFloat())
             }
         } else if (unwrapped is Number) {
-            modifier = modifier.rotate(unwrapped.toFloat())
+            nextModifier = nextModifier.rotate(unwrapped.toFloat())
         }
-        return this
+        return copy(nextModifier)
     }
 
     fun offset(x: Any, y: Any): LuaModifier {
@@ -233,10 +236,11 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun offset(tableRaw: Any): LuaModifier {
+        var nextModifier = modifier
         val tableValue = if (tableRaw is ScriptValue) tableRaw else ComposeBridge.engine.coerceJavaToScript(tableRaw)
         if (tableValue.isFunction()) {
             val table = tableValue.asFunction()
-            modifier = modifier.offset {
+            nextModifier = nextModifier.offset {
                 val res = table.call()
                 val unwrapped = ComposeBridge.unwrapAny(res)
                 
@@ -246,7 +250,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                     androidx.compose.ui.unit.IntOffset.Zero
                 }
             }
-            return this
+            return copy(nextModifier)
         }
         val unwrapped = ComposeBridge.unwrapAny(tableRaw)
         if (unwrapped is Map<*, *>) {
@@ -258,6 +262,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun clickable(onClickOrTable: Any): LuaModifier {
+        var nextModifier = modifier
         val unwrapped = ComposeBridge.unwrapAny(onClickOrTable)
         var onClickFunc: ScriptFunction? = null
         var enabled = true
@@ -276,7 +281,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         }
 
         if (onClickFunc != null) {
-            modifier = modifier.clickable(enabled = enabled) {
+            nextModifier = nextModifier.clickable(enabled = enabled) {
                 try {
                     onClickFunc.call()
                 } catch (e: Exception) {
@@ -284,7 +289,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                 }
             }
         }
-        return this
+        return copy(nextModifier)
     }
 
     fun animateContentSize(): LuaModifier {
@@ -294,6 +299,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
 
     @OptIn(ExperimentalSharedTransitionApi::class)
     fun sharedElement(config: Any): LuaModifier {
+        var nextModifier = modifier
         val scope = ComposeBridge.getActiveSharedTransitionScope() 
             ?: ComposeBridge.findContextReceiver<androidx.compose.animation.SharedTransitionScope>() 
             ?: return copy()
@@ -329,17 +335,18 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             else -> SharedTransitionDefaults.BoundsTransform
         }
 
-        modifier = with(scope) {
+        nextModifier = with(scope) {
             modifier.sharedElement(
                 sharedContentState = state,
                 animatedVisibilityScope = visibilityScope,
                 boundsTransform = boundsTransform
             )
         }
-        return this
+        return copy(nextModifier)
     }
 
     fun pointerInput(arg: Any): LuaModifier {
+        var nextModifier = modifier
         val blockValue = if (arg is ScriptValue) arg else ComposeBridge.engine.coerceJavaToScript(arg)
         if (blockValue.isFunction()) {
             return internalPointerInput(emptyArray(), arg)
@@ -352,7 +359,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             val onDrag = unwrapped["onDrag"] as? ScriptFunction
 
             if (onTap != null || onDoubleTap != null || onLongPress != null) {
-                modifier = modifier.pointerInput("tapGestures") {
+                nextModifier = nextModifier.pointerInput("tapGestures") {
                     detectTapGestures(
                         onTap = onTap?.let { fn ->
                             { offset ->
@@ -385,7 +392,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                 }
             }
             if (onDrag != null) {
-                modifier = modifier.pointerInput("dragGestures") {
+                nextModifier = nextModifier.pointerInput("dragGestures") {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
                         val changeTable = ComposeBridge.engine.createTable()
@@ -397,10 +404,11 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                 }
             }
         }
-        return this
+        return copy(nextModifier)
     }
 
     fun clip(shape: String, radius: Int): LuaModifier {
+        var nextModifier = modifier
         val clipShape = when (shape.lowercase()) {
             "circle", "circleshape" -> CircleShape
             "rounded", "roundedcornershape" -> RoundedCornerShape(radius.dp)
@@ -408,9 +416,9 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             else -> null
         }
         if (clipShape != null) {
-            modifier = modifier.clip(clipShape)
+            nextModifier = nextModifier.clip(clipShape)
         }
-        return this
+        return copy(nextModifier)
     }
 
 
@@ -461,17 +469,19 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                     }
                 }
             }
-            modifier = when (keys.size) {
+            val nextMod = when (keys.size) {
                 0 -> modifier.pointerInput(Unit, lambda)
                 1 -> modifier.pointerInput(keys[0], lambda)
                 2 -> modifier.pointerInput(keys[0], keys[1], lambda)
                 else -> modifier.pointerInput(*keys, block = lambda)
             }
+            return copy(nextMod)
         }
         return this
     }
 
     fun clip(shapeProp: Any): LuaModifier {
+        var nextModifier = modifier
         val unwrapped = ComposeBridge.unwrapAny(shapeProp)
         if (unwrapped is Map<*, *>) {
             val shape = unwrapped["shape"] ?: unwrapped[1.0] ?: unwrapped[1]
@@ -479,12 +489,13 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         }
         val clipShape = resolveShape(unwrapped)
         if (clipShape != null) {
-            modifier = modifier.clip(clipShape)
+            nextModifier = nextModifier.clip(clipShape)
         }
-        return this
+        return copy(nextModifier)
     }
 
     fun border(tableOrWidth: Any): LuaModifier {
+        var nextModifier = modifier
         val unwrapped = ComposeBridge.unwrapAny(tableOrWidth)
         if (unwrapped is Map<*, *>) {
             val width = unwrapped["width"] ?: unwrapped[1.0] ?: unwrapped[1]
@@ -495,63 +506,67 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                 val w = resolveDp(width)
                 val c = resolveColor(color)
                 if (resolvedShape != null) {
-                    modifier = modifier.border(w, c, resolvedShape)
+                    nextModifier = nextModifier.border(w, c, resolvedShape)
                 } else {
-                    modifier = modifier.border(w, c)
+                    nextModifier = nextModifier.border(w, c)
                 }
             }
         }
-        return this
+        return copy(nextModifier)
     }
 
     fun border(width: Any, color: Any): LuaModifier {
+        var nextModifier = modifier
         try {
-            modifier = modifier.border(resolveDp(width), resolveColor(color))
+            nextModifier = nextModifier.border(resolveDp(width), resolveColor(color))
         } catch (e: Exception) {
             e.printStackTrace()
         }
-        return this
+        return copy(nextModifier)
     }
 
 
 
     fun align(alignStrOrObj: Any): LuaModifier {
+        val next = copy()
         val unwrapped = ComposeBridge.unwrapAny(alignStrOrObj)
         if (unwrapped is String) {
-            this.alignmentStr = unwrapped
+            next.alignmentStr = unwrapped
         } else {
-            this.alignObject = unwrapped
+            next.alignObject = unwrapped
         }
-        return this
+        return next
     }
 
     fun weight(weight: Any): LuaModifier {
+        val next = copy()
         val unwrapped = ComposeBridge.unwrapAny(weight)
         if (unwrapped is Map<*, *>) {
             val w = unwrapped["weight"] ?: unwrapped[1.0] ?: unwrapped[1]
             val f = unwrapped["fill"] ?: unwrapped[2.0] ?: unwrapped[2]
             if (w != null) {
-                this.weightVal = (w as? Number)?.toFloat() ?: 1f
+                next.weightVal = (w as? Number)?.toFloat() ?: 1f
             }
             if (f != null) {
-                this.weightFill = f as? Boolean ?: true
+                next.weightFill = f as? Boolean ?: true
             }
         } else if (unwrapped is Number) {
-            this.weightVal = unwrapped.toFloat()
+            next.weightVal = unwrapped.toFloat()
         }
-        return this
+        return next
     }
 
     fun weight(weight: Any, fill: Any): LuaModifier {
+        val next = copy()
         val unwrappedWeight = ComposeBridge.unwrapAny(weight)
         if (unwrappedWeight is Number) {
-            this.weightVal = unwrappedWeight.toFloat()
+            next.weightVal = unwrappedWeight.toFloat()
         }
         val unwrappedFill = ComposeBridge.unwrapAny(fill)
         if (unwrappedFill is Boolean) {
-            this.weightFill = unwrappedFill
+            next.weightFill = unwrappedFill
         }
-        return this
+        return next
     }
 
 
@@ -569,17 +584,18 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun widthIn(table: Any): LuaModifier {
+        var nextModifier = modifier
         val unwrapped = ComposeBridge.unwrapAny(table)
         if (unwrapped is Map<*, *>) {
             val min = unwrapped["min"] ?: unwrapped[1.0] ?: unwrapped[1]
             val max = unwrapped["max"] ?: unwrapped[2.0] ?: unwrapped[2]
             val minDp = if (min != null) resolveDp(min) else Dp.Unspecified
             val maxDp = if (max != null) resolveDp(max) else Dp.Unspecified
-            modifier = modifier.widthIn(min = minDp, max = maxDp)
+            nextModifier = nextModifier.widthIn(min = minDp, max = maxDp)
         } else {
-            modifier = modifier.widthIn(min = resolveDp(unwrapped))
+            nextModifier = nextModifier.widthIn(min = resolveDp(unwrapped))
         }
-        return this
+        return copy(nextModifier)
     }
 
 
@@ -594,17 +610,18 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun heightIn(table: Any): LuaModifier {
+        var nextModifier = modifier
         val unwrapped = ComposeBridge.unwrapAny(table)
         if (unwrapped is Map<*, *>) {
             val min = unwrapped["min"] ?: unwrapped[1.0] ?: unwrapped[1]
             val max = unwrapped["max"] ?: unwrapped[2.0] ?: unwrapped[2]
             val minDp = if (min != null) resolveDp(min) else Dp.Unspecified
             val maxDp = if (max != null) resolveDp(max) else Dp.Unspecified
-            modifier = modifier.heightIn(min = minDp, max = maxDp)
+            nextModifier = nextModifier.heightIn(min = minDp, max = maxDp)
         } else {
-            modifier = modifier.heightIn(min = resolveDp(unwrapped))
+            nextModifier = nextModifier.heightIn(min = resolveDp(unwrapped))
         }
-        return this
+        return copy(nextModifier)
     }
 
 
@@ -629,6 +646,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun sizeIn(table: Any): LuaModifier {
+        var nextModifier = modifier
         val unwrapped = ComposeBridge.unwrapAny(table)
         if (unwrapped is Map<*, *>) {
             val minWidth = unwrapped["minWidth"] ?: unwrapped["min"] ?: unwrapped[1.0] ?: unwrapped[1]
@@ -641,16 +659,16 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             val maxWidthDp = if (maxWidth != null) resolveDp(maxWidth) else Dp.Unspecified
             val maxHeightDp = if (maxHeight != null) resolveDp(maxHeight) else Dp.Unspecified
 
-            modifier = modifier.sizeIn(
+            nextModifier = nextModifier.sizeIn(
                 minWidth = minWidthDp,
                 minHeight = minHeightDp,
                 maxWidth = maxWidthDp,
                 maxHeight = maxHeightDp
             )
         } else {
-            modifier = modifier.sizeIn(minWidth = resolveDp(unwrapped), minHeight = resolveDp(unwrapped))
+            nextModifier = nextModifier.sizeIn(minWidth = resolveDp(unwrapped), minHeight = resolveDp(unwrapped))
         }
-        return this
+        return copy(nextModifier)
     }
 
 
@@ -664,10 +682,11 @@ class LuaModifier(var modifier: Modifier = Modifier) {
     }
 
     fun drawBehind(blockRaw: Any): LuaModifier {
+        var nextModifier = modifier
         val blockValue = if (blockRaw is ScriptValue) blockRaw else ComposeBridge.engine.coerceJavaToScript(blockRaw)
         if (blockValue.isFunction()) {
             val block = blockValue.asFunction()
-            modifier = modifier.drawBehind {
+            nextModifier = nextModifier.drawBehind {
                 val scopeTable = ComposeBridge.javaToScript(this)
                 try {
                     block.call(scopeTable)
@@ -676,14 +695,15 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                 }
             }
         }
-        return this
+        return copy(nextModifier)
     }
 
     fun drawWithContent(blockRaw: Any): LuaModifier {
+        var nextModifier = modifier
         val blockValue = if (blockRaw is ScriptValue) blockRaw else ComposeBridge.engine.coerceJavaToScript(blockRaw)
         if (blockValue.isFunction()) {
             val block = blockValue.asFunction()
-            modifier = modifier.drawWithContent {
+            nextModifier = nextModifier.drawWithContent {
                 val scopeTable = ComposeBridge.javaToScript(this)
                 try {
                     block.call(scopeTable)
@@ -692,14 +712,15 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                 }
             }
         }
-        return this
+        return copy(nextModifier)
     }
 
     fun graphicsLayer(blockRaw: Any): LuaModifier {
+        var nextModifier = modifier
         val blockValue = if (blockRaw is ScriptValue) blockRaw else ComposeBridge.engine.coerceJavaToScript(blockRaw)
         if (blockValue.isFunction()) {
             val block = blockValue.asFunction()
-            modifier = modifier.graphicsLayer {
+            nextModifier = nextModifier.graphicsLayer {
                 val scopeTable = ComposeBridge.javaToScript(this)
                 try {
                     block.call(scopeTable)
@@ -711,7 +732,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
             // Also support passing a table to configure properties without a function
             val unwrapped = ComposeBridge.unwrapAny(blockRaw)
             if (unwrapped is Map<*, *>) {
-                modifier = modifier.graphicsLayer {
+                nextModifier = nextModifier.graphicsLayer {
                     val scopeTable = ComposeBridge.javaToScript(this)
                     for ((k, v) in unwrapped) {
                         try {
@@ -737,7 +758,7 @@ class LuaModifier(var modifier: Modifier = Modifier) {
                 }
             }
         }
-        return this
+        return copy(nextModifier)
     }
 
 

@@ -247,12 +247,31 @@ class LuaModifier(var modifier: Modifier = Modifier) {
         return offset(unwrapped ?: 0, 0)
     }
 
-    fun clickable(onClick: ScriptFunction): LuaModifier {
-        modifier = modifier.clickable {
-            try {
-                onClick.call()
-            } catch (e: Exception) {
-                e.printStackTrace()
+    fun clickable(onClickOrTable: Any): LuaModifier {
+        val unwrapped = ComposeBridge.unwrapAny(onClickOrTable)
+        var onClickFunc: ScriptFunction? = null
+        var enabled = true
+
+        when (unwrapped) {
+            is ScriptFunction -> {
+                onClickFunc = unwrapped
+            }
+            is Map<*, *> -> {
+                onClickFunc = (unwrapped["onClick"] ?: unwrapped[1.0] ?: unwrapped[1]) as? ScriptFunction
+                val enabledVal = unwrapped["enabled"] ?: unwrapped["clickable"]
+                if (enabledVal is Boolean) {
+                    enabled = enabledVal
+                }
+            }
+        }
+
+        if (onClickFunc != null) {
+            modifier = modifier.clickable(enabled = enabled) {
+                try {
+                    onClickFunc.call()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
         return this

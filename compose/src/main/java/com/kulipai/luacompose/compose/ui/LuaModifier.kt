@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
@@ -64,6 +65,9 @@ class LuaModifier(val modifier: Modifier = Modifier) {
 
     fun padding(dpOrTable: Any): LuaModifier {
         val unwrapped = ComposeBridge.unwrapAny(dpOrTable)
+        if (unwrapped is PaddingValues) {
+            return copy(modifier.padding(unwrapped))
+        }
         if (unwrapped is Map<*, *>) {
             val all = unwrapped["all"] ?: unwrapped[1.0] ?: unwrapped[1]
             if (all != null) return padding(all)

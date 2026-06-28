@@ -11,4 +11,6 @@ import com.kulipai.luacompose.annotations.LuaBridgePackage
 @com.kulipai.luacompose.annotations.LuaBridgeClass(targetClass = androidx.compose.ui.unit.Dp::class, category = "ui.unit")
 @com.kulipai.luacompose.annotations.LuaBridgeModifiers(packageName = "androidx.compose.foundation.layout")
 @com.kulipai.luacompose.annotations.LuaBridgeLocals(packageName = "androidx.compose.ui.platform", category = "ui.platform")
+@LuaBridgePackage(packageName = "androidx.navigation3.ui", category = "navigation3")
+@LuaBridgePackage(packageName = "androidx.navigation3.runtime", category = "navigation3")
 class LuaComposeConfig

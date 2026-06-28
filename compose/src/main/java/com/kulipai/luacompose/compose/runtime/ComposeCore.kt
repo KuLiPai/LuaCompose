@@ -292,9 +292,12 @@ object ComposeBridge {
                 val name = clazz.name
                 if (name.startsWith("java.") || name.startsWith("javax.") ||
                     name.startsWith("android.") || 
+                    name.startsWith("org.luaj.") ||
                     (name.startsWith("androidx.") && !name.startsWith("androidx.compose.")) ||
                     value is android.content.Context ||
-                    value is android.view.View) {
+                    value is android.view.View ||
+                    value is java.util.Collection<*> ||
+                    value is java.util.Map<*, *>) {
                     return engine.coerceJavaToScript(value)
                 }
                 
@@ -326,7 +329,29 @@ object ComposeBridge {
             val fieldMap = mutableMapOf<String, java.lang.reflect.Field>()
             val funcMap = mutableMapOf<String, MutableList<java.lang.reflect.Method>>()
             
-            for (method in javaClass.methods) {
+            val methodsToCache = mutableListOf<java.lang.reflect.Method>()
+            var currentClass: Class<*>? = javaClass
+            val visitedInterfaces = mutableSetOf<Class<*>>()
+            
+            while (currentClass != null) {
+                methodsToCache.addAll(currentClass.methods)
+                
+                val interfacesToProcess = currentClass.interfaces.toMutableList()
+                while (interfacesToProcess.isNotEmpty()) {
+                    val iface = interfacesToProcess.removeAt(0)
+                    if (visitedInterfaces.add(iface)) {
+                        methodsToCache.addAll(iface.methods)
+                        interfacesToProcess.addAll(iface.interfaces)
+                    }
+                }
+                currentClass = currentClass.superclass
+            }
+            
+            for (method in methodsToCache) {
+                try {
+                    method.isAccessible = true
+                } catch (e: Exception) {}
+                
                 var name = method.name
                 val dashIndex = name.indexOf('-')
                 if (dashIndex != -1) {

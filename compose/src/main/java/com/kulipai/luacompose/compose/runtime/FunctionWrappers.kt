@@ -36,47 +36,47 @@ object FunctionWrappers {
         } else {
             return when (paramTypeName) {
                 "kotlin.jvm.functions.Function0" -> {
-                    val func: () -> Unit = { scriptFunction?.call() }
+                    val func: () -> Any? = { ComposeBridge.scriptToJava(scriptFunction?.call()) }
                     func
                 }
                 "kotlin.jvm.functions.Function1" -> {
-                    val func: (Any?) -> Unit = { p1 -> 
-                        scriptFunction?.call(ScopeWrappers.wrap(p1))
+                    val func: (Any?) -> Any? = { p1 -> 
+                        ComposeBridge.scriptToJava(scriptFunction?.call(ScopeWrappers.wrap(p1)))
                     }
                     func
                 }
                 "kotlin.jvm.functions.Function2" -> {
-                    val func: (Any?, Any?) -> Unit = { p1, p2 -> 
-                        scriptFunction?.call(
+                    val func: (Any?, Any?) -> Any? = { p1, p2 -> 
+                        ComposeBridge.scriptToJava(scriptFunction?.call(
                             ScopeWrappers.wrap(p1),
                             ScopeWrappers.wrap(p2)
-                        )
+                        ))
                     }
                     func
                 }
                 "kotlin.jvm.functions.Function3" -> {
-                    val func: (Any?, Any?, Any?) -> Unit = { p1, p2, p3 -> 
-                        scriptFunction?.call(
+                    val func: (Any?, Any?, Any?) -> Any? = { p1, p2, p3 -> 
+                        ComposeBridge.scriptToJava(scriptFunction?.call(
                             ScopeWrappers.wrap(p1),
                             ScopeWrappers.wrap(p2),
                             ScopeWrappers.wrap(p3)
-                        )
+                        ))
                     }
                     func
                 }
                 "kotlin.jvm.functions.Function4" -> {
-                    val func: (Any?, Any?, Any?, Any?) -> Unit = { p1, p2, p3, p4 -> 
-                        scriptFunction?.call(
+                    val func: (Any?, Any?, Any?, Any?) -> Any? = { p1, p2, p3, p4 -> 
+                        ComposeBridge.scriptToJava(scriptFunction?.call(
                             ScopeWrappers.wrap(p1),
                             ScopeWrappers.wrap(p2),
                             ScopeWrappers.wrap(p3),
                             ScopeWrappers.wrap(p4)
-                        )
+                        ))
                     }
                     func
                 }
                 else -> {
-                    val func: () -> Unit = { scriptFunction?.call() }
+                    val func: () -> Any? = { ComposeBridge.scriptToJava(scriptFunction?.call()) }
                     func
                 }
             }

@@ -288,6 +288,14 @@ object ComposeBridge {
                         return converter(value)
                     }
                 }
+                
+                val name = clazz.name
+                if (name.startsWith("java.") || name.startsWith("javax.") ||
+                    name.startsWith("android.") || 
+                    (name.startsWith("androidx.") && !name.startsWith("androidx.compose."))) {
+                    return engine.coerceJavaToScript(value)
+                }
+                
                 // Fallback to our generic wrapObject!
                 wrapObject(value)
             }

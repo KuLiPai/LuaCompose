@@ -304,6 +304,7 @@ object LuaComposeRegistry {
         registerPlugin(AnimationCorePlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.geometry.UiGeometryPlugin())
         registerPlugin(com.kulipai.luacompose.compose.ui.unit.UiUnitPlugin())
+        registerPlugin(com.kulipai.luacompose.compose.navigation3.Navigation3Plugin())
 
         com.kulipai.luacompose.compose.runtime.ComposeBridge.converters[androidx.compose.ui.graphics.drawscope.DrawScope::class.java] = { scope ->
             createComposeDrawScope(scope as androidx.compose.ui.graphics.drawscope.DrawScope) 

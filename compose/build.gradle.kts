@@ -48,6 +48,10 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
 
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+
+
     implementation(project(":androlua"))
 
 }

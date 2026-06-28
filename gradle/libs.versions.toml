@@ -6,6 +6,7 @@ activityCompose = "1.13.0"
 kotlin = "2.4.0"
 composeBom = "2026.06.00"
 ksp = "2.3.9"
+navigation3 = "1.1.3"
 
 [libraries]
 androidx-compose-material-icons-core = { module = "androidx.compose.material:material-icons-core" }
@@ -22,6 +23,12 @@ kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
 ksp-api = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
 kotlinpoet = { group = "com.squareup", name = "kotlinpoet", version = "2.3.0" }
 kotlinpoet-ksp = { group = "com.squareup", name = "kotlinpoet-ksp", version = "2.3.0" }
+
+androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
+androidx-navigation3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "navigation3" }
+
+
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

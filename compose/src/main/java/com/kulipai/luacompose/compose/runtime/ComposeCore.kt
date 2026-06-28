@@ -292,7 +292,9 @@ object ComposeBridge {
                 val name = clazz.name
                 if (name.startsWith("java.") || name.startsWith("javax.") ||
                     name.startsWith("android.") || 
-                    (name.startsWith("androidx.") && !name.startsWith("androidx.compose."))) {
+                    (name.startsWith("androidx.") && !name.startsWith("androidx.compose.")) ||
+                    value is android.content.Context ||
+                    value is android.view.View) {
                     return engine.coerceJavaToScript(value)
                 }
                 

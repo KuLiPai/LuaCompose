@@ -1,8 +1,8 @@
-# luaCompose 📱
+# LuaCompose 📱
 
 > **🚨 注意：本项目目前处于 `1.0.0-experimental` 阶段，属于不稳定的实验性、开发中版本。API 接口与功能实现可能会有较大变动。**
 
-`luaCompose` 是一个将 **Lua 脚本** 与 **Android Jetpack Compose** 结合的动态化 UI 框架。它允许开发者使用 Lua 脚本动态定义、渲染和更新原生的 Compose 组件，旨在探索 Android 端基于 Lua 语言的动态化 UI 布局与热重载。
+`LuaCompose` 是一个将 **Lua 脚本** 与 **Android Jetpack Compose** 结合的动态化 UI 框架。它允许开发者使用 Lua 脚本动态定义、渲染和更新原生的 Compose 组件，旨在探索 Android 端基于 Lua 语言的动态化 UI 布局与热重载。
 
 ---
 

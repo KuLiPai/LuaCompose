@@ -1,8 +1,8 @@
-# luaCompose 📱
+# LuaCompose 📱
 
 > **🚨 Notice: This project is currently in the `1.0.0-experimental` stage. It is an unstable, in-development experimental version. APIs and functionality are subject to significant changes.**
 
-`luaCompose` is a dynamic UI framework that integrates **Lua scripting** with **Android Jetpack Compose**. It allows developers to dynamically define, render, and update native Compose components using Lua scripts, aiming to explore dynamic UI layouts and hot-reloading on Android through the Lua language.
+`LuaCompose` is a dynamic UI framework that integrates **Lua scripting** with **Android Jetpack Compose**. It allows developers to dynamically define, render, and update native Compose components using Lua scripts, aiming to explore dynamic UI layouts and hot-reloading on Android through the Lua language.
 
 ---
 

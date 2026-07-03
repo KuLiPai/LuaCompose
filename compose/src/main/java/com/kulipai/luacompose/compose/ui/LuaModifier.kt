@@ -46,7 +46,8 @@ import com.kulipai.luacompose.compose.script.ScriptValue
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-// --- 3. 极其优雅的链式 Modifier 封装 ---
+// 链式 Modifier 封装
+// TODO)) 跨平台: 以lua的方式传入给lua层，而不是反射
 class LuaModifier(val modifier: Modifier = Modifier) {
     var alignmentStr: String? = null
     var alignObject: Any? = null

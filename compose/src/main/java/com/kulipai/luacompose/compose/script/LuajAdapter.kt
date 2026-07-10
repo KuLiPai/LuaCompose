@@ -1,4 +1,4 @@
-package com.kulipai.luacompose.adapter
+package com.kulipai.luacompose.compose.script
 
 import com.kulipai.luacompose.compose.script.*
 import org.luaj.LuaValue

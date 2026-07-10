@@ -1,4 +1,4 @@
-package com.kulipai.luacompose.compose.ui
+package com.kulipai.luacompose.compose.ui.platform
 
 import android.content.Context
 import android.util.AttributeSet
@@ -12,7 +12,7 @@ import com.kulipai.luacompose.compose.script.ScriptFunction
  * A standard Android View that can render a Lua Compose function.
  * This allows integrating Lua Compose into standard Android XML layouts or View hierarchies.
  */
-class LuaComposeView @JvmOverloads constructor(
+class ComposeView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
     defStyleAttr: Int = 0
@@ -33,10 +33,29 @@ class LuaComposeView @JvmOverloads constructor(
         requestLayout()
     }
 
+    var isDynamicColorEnabled: Boolean = true
+
     @Composable
     override fun Content() {
-        composeScope?.let { scope ->
-            ComposeScopeComponent(scope)
+        val colorScheme = when {
+            isDynamicColorEnabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S -> {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                if (androidx.compose.foundation.isSystemInDarkTheme()) {
+                    androidx.compose.material3.dynamicDarkColorScheme(context)
+                } else {
+                    androidx.compose.material3.dynamicLightColorScheme(context)
+                }
+            }
+            androidx.compose.foundation.isSystemInDarkTheme() -> androidx.compose.material3.darkColorScheme()
+            else -> androidx.compose.material3.lightColorScheme()
+        }
+
+        androidx.compose.material3.MaterialTheme(
+            colorScheme = colorScheme
+        ) {
+            composeScope?.let { scope ->
+                ComposeScopeComponent(scope)
+            }
         }
     }
 }

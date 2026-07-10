@@ -16,7 +16,7 @@ import com.kulipai.luacompose.compose.ui.LuaModifier
 import com.kulipai.luacompose.compose.runtime.ComposeScope
 import com.kulipai.luacompose.compose.ui.graphics.ComposeScopeComponent
 import com.kulipai.luacompose.ui.theme.LuaComposeTheme
-import com.kulipai.luacompose.adapter.LuajEngine
+import com.kulipai.luacompose.compose.script.LuajEngine
 import com.kulipai.luacompose.compose.LuaComposeLib
 import com.kulipai.luacompose.compose.runtime.ComposeBridge
 import org.luaj.Globals

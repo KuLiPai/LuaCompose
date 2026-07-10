@@ -1,6 +1,6 @@
 package com.kulipai.luacompose
 
-import com.kulipai.luacompose.adapter.LuajEngine
+import com.kulipai.luacompose.compose.script.LuajEngine
 import com.kulipai.luacompose.compose.LuaComposeLib
 import com.kulipai.luacompose.compose.runtime.ComposeScope
 import com.kulipai.luacompose.compose.runtime.ComposeBridge

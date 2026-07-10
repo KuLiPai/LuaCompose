@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    `maven-publish`
 }
 
 android {
@@ -27,6 +28,12 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDir("build/generated/ksp/debug/kotlin")
+        }
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
         }
     }
 }
@@ -56,3 +63,15 @@ dependencies {
 
 }
 
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components["release"])
+                groupId = "com.kulipai.luacompose"
+                artifactId = "compose"
+                version = "1.0.0-SNAPSHOT"
+            }
+        }
+    }
+}

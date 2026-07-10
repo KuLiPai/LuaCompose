@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
+    `maven-publish`
 }
 
 android {
@@ -18,6 +19,12 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
 }
 
 
@@ -26,4 +33,17 @@ dependencies {
 
     api(fileTree("libs"))
 
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components["release"])
+                groupId = "com.kulipai.luacompose"
+                artifactId = "androlua"
+                version = "1.0.0-SNAPSHOT"
+            }
+        }
+    }
 }
